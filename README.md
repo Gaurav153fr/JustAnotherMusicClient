@@ -14,7 +14,7 @@ A desktop YouTube Music client built with Tauri, React, and TypeScript.
 
 > **IMPORTANT**
 >
-> This is an independent, unofficial project and is not affiliated with, authorized by, sponsored by, or endorsed by YouTube or Google.
+> This is an independent, unofficial project and is not affiliated with, authorized by, sponsored by, or endorsed by YouTube or Google. The only reason I am making this, is becuase there is no official YouTube music desktop client. 
 > 
 >
 
@@ -22,12 +22,18 @@ A desktop YouTube Music client built with Tauri, React, and TypeScript.
 
 JustAnotherMusicClient brings YouTube Music to the desktop in a focused, native-feeling application. YouTube does not provide an official desktop client, so this project aims to provide a polished alternative that integrates with YouTube Music while keeping the experience fast and familiar.
 
-## Features
+<picture>
+    <img 
+      width="831px"
+      src="assets\img\screenshot01.png"
+    >
+</picture>
 
+## Features
+- Create multiple music tabs, each with its own playback queue, volume, and player state.
 - Browse, search, and play music from YouTube Music.
 - Sign in to access your YouTube Music library, playlists, recommendations, and other account features.
 - Add songs to your playlists.
-- Create multiple music tabs, each with its own playback queue, volume, and player state.
 - A polished desktop experience designed to work without getting in your way.
 
 ## Download
@@ -87,6 +93,7 @@ Install Rust and Cargo from [rustup.rs](https://rustup.rs/), restart your termin
 Install the [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/), then run the app again.
 
 ## Third-Party Services
+If anyone from Google reads this: There was no official client, I just wanted a good desktop client. Thats why I made this, please don't sue me!
 
 The application interacts with YouTube and YouTube Music. Access to those services remains governed by their respective terms, policies, availability, and regional restrictions.
 
