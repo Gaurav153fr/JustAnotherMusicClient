@@ -1,0 +1,267 @@
+.page {
+  width: min(760px, 100%);
+  margin: 0 auto;
+  padding-top: 56px;
+}
+
+.heading {
+  margin-bottom: 32px;
+}
+
+.eyebrow {
+  display: block;
+  margin-bottom: var(--spacing-sm);
+  color: var(--color-accent);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.heading h1 {
+  margin: 0 0 var(--spacing-sm);
+  color: var(--color-text-primary);
+  font-size: 32px;
+}
+
+.heading p,
+.cardHeader p {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.card {
+  padding: var(--spacing-lg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated);
+}
+
+.card + .card {
+  margin-top: var(--spacing-lg);
+}
+
+.cardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-lg);
+  padding-bottom: var(--spacing-lg);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.cardHeader h2 {
+  margin: 0 0 var(--spacing-xs);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-lg);
+}
+
+.status {
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.status.connected {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.cardIcon {
+  color: var(--color-text-muted);
+}
+
+.accountRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding-top: var(--spacing-lg);
+}
+
+.avatar,
+.avatarPlaceholder {
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  border-radius: var(--radius-full);
+}
+
+.avatar {
+  object-fit: cover;
+}
+
+.avatarPlaceholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg-overlay);
+  color: var(--color-text-muted);
+}
+
+.accountDetails {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.accountName {
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accountDescription {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.signOutButton,
+.signInButton,
+.secondaryButton,
+.dangerButton {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  padding: 0 var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  font: inherit;
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.signOutButton:hover,
+.signInButton:hover,
+.secondaryButton:hover,
+.dangerButton:hover {
+  border-color: var(--color-accent);
+  background: var(--color-bg-overlay);
+}
+
+.signInButton:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.secondaryButton:disabled,
+.dangerButton:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.cacheBody {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--spacing-lg);
+  padding-top: var(--spacing-lg);
+}
+
+.cacheUsage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.cacheUsage strong {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-md);
+}
+
+.cacheControls {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--spacing-sm);
+}
+
+.cacheSizeField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.inputWithUnit {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+}
+
+.inputWithUnit:focus-within {
+  border-color: var(--color-accent);
+}
+
+.inputWithUnit input {
+  width: 84px;
+  height: 100%;
+  padding: 0 4px 0 var(--spacing-sm);
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--color-text-primary);
+  font: inherit;
+}
+
+.inputWithUnit > span {
+  padding-right: var(--spacing-sm);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.dangerButton {
+  color: var(--color-accent);
+}
+
+.error {
+  margin: var(--spacing-md) 0 0;
+  color: var(--color-accent);
+  font-size: var(--font-size-sm);
+}
+
+@media (max-width: 720px) {
+  .page {
+    padding-top: 32px;
+  }
+
+  .accountRow {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .signOutButton,
+  .signInButton {
+    width: 100%;
+  }
+
+  .cacheBody,
+  .cacheControls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .secondaryButton,
+  .dangerButton {
+    width: 100%;
+  }
+}

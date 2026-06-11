@@ -1,0 +1,41 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+.vite
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.vs
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sw?
+*.user
+*.userosscache
+*.sln.docstates
+*.VC.db
+*.VC.VC.opendb
+
+# Tooling caches
+.eslintcache
+
+# Rust / Tauri lockfile (ignore if you don't want pinned deps)
+src-tauri/Cargo.lock
+
+.vscode/*
+
+outputs/*
+.codex/*

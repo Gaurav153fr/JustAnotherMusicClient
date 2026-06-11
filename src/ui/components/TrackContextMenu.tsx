@@ -1,0 +1,396 @@
+import {
+  createContext,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  IconCheck,
+  IconLink,
+  IconListDetails,
+  IconLoader2,
+  IconMusicPlus,
+  IconPlayerTrackNext,
+  IconPlaylist,
+  IconSearch,
+  IconX,
+} from "@tabler/icons-react";
+import type { Playlist, Track } from "../../datasource/types";
+import type { LibraryController } from "../../player/LibraryController";
+import {
+  playerController,
+  useLibraryState,
+  usePlayerState,
+} from "../../player/playerStore";
+import { TrackArtwork } from "./TrackArtwork";
+import styles from "./TrackContextMenu.module.css";
+
+interface MenuPosition {
+  x: number;
+  y: number;
+}
+
+interface TrackContextMenuValue {
+  openTrackMenu: (event: ReactMouseEvent, track: Track) => void;
+}
+
+interface TrackContextMenuProviderProps {
+  children: ReactNode;
+  libraryController: LibraryController;
+}
+
+const TrackContextMenuContext = createContext<TrackContextMenuValue | null>(null);
+
+export function useTrackContextMenu(): TrackContextMenuValue {
+  const value = useContext(TrackContextMenuContext);
+  if (!value) {
+    throw new Error("useTrackContextMenu must be used within TrackContextMenuProvider.");
+  }
+  return value;
+}
+
+export function TrackContextMenuProvider({
+  children,
+  libraryController,
+}: TrackContextMenuProviderProps) {
+  const libraryState = useLibraryState();
+  const playerState = usePlayerState();
+  const searchRef = useRef<HTMLInputElement>(null);
+  const playlistRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const toastTimerRef = useRef<number | null>(null);
+  const [track, setTrack] = useState<Track | null>(null);
+  const [menuPosition, setMenuPosition] = useState<MenuPosition | null>(null);
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [selectedPlaylistIndex, setSelectedPlaylistIndex] = useState<number | null>(null);
+  const [addingPlaylistId, setAddingPlaylistId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+
+  const playlists = useMemo(() => {
+    const normalizedQuery = query.trim().toLocaleLowerCase();
+    const items = libraryState.library?.playlists ?? [];
+    if (!normalizedQuery) return items;
+    return items.filter((playlist) =>
+      playlist.title.toLocaleLowerCase().includes(normalizedQuery)
+    );
+  }, [libraryState.library?.playlists, query]);
+
+  useEffect(() => {
+    if (!menuPosition) return;
+    const closeMenu = () => setMenuPosition(null);
+    window.addEventListener("mousedown", closeMenu);
+    window.addEventListener("blur", closeMenu);
+    return () => {
+      window.removeEventListener("mousedown", closeMenu);
+      window.removeEventListener("blur", closeMenu);
+    };
+  }, [menuPosition]);
+
+  useEffect(() => {
+    if (isPickerOpen) {
+      requestAnimationFrame(() => searchRef.current?.focus());
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || (!isPickerOpen && !menuPosition)) return;
+      event.preventDefault();
+      setMenuPosition(null);
+      if (!addingPlaylistId) setIsPickerOpen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [addingPlaylistId, isPickerOpen, menuPosition]);
+
+  useEffect(() => {
+    if (selectedPlaylistIndex === null) return;
+    playlistRefs.current[selectedPlaylistIndex]?.scrollIntoView({
+      block: "nearest",
+    });
+  }, [selectedPlaylistIndex]);
+
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      const ctrlOnly = event.ctrlKey
+        && !event.altKey
+        && !event.metaKey
+        && !event.shiftKey;
+      if (!ctrlOnly || event.code !== "KeyS") return;
+
+      event.preventDefault();
+      if (!playerState.currentTrack || addingPlaylistId) return;
+
+      setTrack(playerState.currentTrack);
+      setMenuPosition(null);
+      setError(null);
+      setQuery("");
+      setSelectedPlaylistIndex(null);
+      setIsPickerOpen(true);
+    };
+
+    window.addEventListener("keydown", handleShortcut);
+    return () => window.removeEventListener("keydown", handleShortcut);
+  }, [addingPlaylistId, playerState.currentTrack]);
+
+  useEffect(() => () => {
+    if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current);
+  }, []);
+
+  const openTrackMenu = (event: ReactMouseEvent, selectedTrack: Track) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setTrack(selectedTrack);
+    setIsPickerOpen(false);
+    setError(null);
+    setQuery("");
+    setSelectedPlaylistIndex(null);
+    setMenuPosition({
+      x: Math.max(8, Math.min(event.clientX, window.innerWidth - 258)),
+      y: Math.max(8, Math.min(event.clientY, window.innerHeight - 192)),
+    });
+  };
+
+  const showToast = (message: string, duration = 3000) => {
+    setToast(message);
+    if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = window.setTimeout(() => setToast(null), duration);
+  };
+
+  const showPersistentToast = (message: string) => {
+    setToast(message);
+    if (toastTimerRef.current !== null) {
+      window.clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = null;
+    }
+  };
+
+  const addToQueue = () => {
+    if (!track) return;
+    playerController.addToQueue(track);
+    setMenuPosition(null);
+    showToast(`Added "${track.title}" to queue`);
+  };
+
+  const playNext = () => {
+    if (!track) return;
+    playerController.playNext(track);
+    setMenuPosition(null);
+    showToast(`"${track.title}" will play next`);
+  };
+
+  const copyLink = async () => {
+    if (!track) return;
+    const selectedTrack = track;
+    setMenuPosition(null);
+    try {
+      await navigator.clipboard.writeText(
+        `https://music.youtube.com/watch?v=${encodeURIComponent(selectedTrack.id)}`,
+      );
+      showToast("Link copied");
+    } catch {
+      showToast("Unable to copy the link.", 4000);
+    }
+  };
+
+  const openPicker = () => {
+    setMenuPosition(null);
+    setError(null);
+    setQuery("");
+    setSelectedPlaylistIndex(null);
+    setIsPickerOpen(true);
+  };
+
+  const handlePickerKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (addingPlaylistId || playlists.length === 0) return;
+
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const direction = event.key === "ArrowDown" ? 1 : -1;
+      setSelectedPlaylistIndex((current) => {
+        if (current === null) return direction === 1 ? 0 : playlists.length - 1;
+        return (current + direction + playlists.length) % playlists.length;
+      });
+      return;
+    }
+
+    if (event.key === "Enter" && selectedPlaylistIndex !== null) {
+      event.preventDefault();
+      const playlist = playlists[selectedPlaylistIndex];
+      if (playlist) void addToPlaylist(playlist);
+    }
+  };
+
+  const addToPlaylist = async (playlist: Playlist) => {
+    if (!track || addingPlaylistId) return;
+    const selectedTrack = track;
+    setAddingPlaylistId(playlist.id);
+    setError(null);
+    setIsPickerOpen(false);
+    showPersistentToast("Adding...");
+    try {
+      const result = await libraryController.addTrackToPlaylist(selectedTrack, playlist);
+      showToast(
+        result === "already-present"
+          ? "Already in playlist"
+          : `Added to ${playlist.title}`,
+      );
+    } catch (addError) {
+      showToast(
+        addError instanceof Error ? addError.message : "Unable to add this song.",
+        4000,
+      );
+    } finally {
+      setAddingPlaylistId(null);
+    }
+  };
+
+  return (
+    <TrackContextMenuContext.Provider value={{ openTrackMenu }}>
+      {children}
+
+      {menuPosition && track && (
+        <div
+          className={styles.contextMenu}
+          style={{ left: menuPosition.x, top: menuPosition.y }}
+          role="menu"
+          onMouseDown={(event) => event.stopPropagation()}
+        >
+          <button type="button" role="menuitem" onClick={playNext}>
+            <IconPlayerTrackNext size={18} aria-hidden="true" />
+            <span className={styles.menuLabel}>Play next</span>
+          </button>
+          <button type="button" role="menuitem" onClick={addToQueue}>
+            <IconListDetails size={18} aria-hidden="true" />
+            <span className={styles.menuLabel}>Add to queue</span>
+          </button>
+          <button type="button" role="menuitem" onClick={openPicker}>
+            <IconMusicPlus size={18} aria-hidden="true" />
+            <span className={styles.menuLabel}>Add to playlist</span>
+            <kbd>Ctrl S</kbd>
+          </button>
+          <button type="button" role="menuitem" onClick={() => void copyLink()}>
+            <IconLink size={18} aria-hidden="true" />
+            <span className={styles.menuLabel}>Copy link</span>
+          </button>
+        </div>
+      )}
+
+      {isPickerOpen && track && (
+        <div
+          className={styles.backdrop}
+          onMouseDown={() => {
+            if (!addingPlaylistId) setIsPickerOpen(false);
+          }}
+        >
+          <section
+            className={styles.panel}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Add ${track.title} to playlist`}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header className={styles.header}>
+              <TrackArtwork
+                className={styles.trackArtwork}
+                artworkUrl={track.artworkUrl}
+                iconSize={24}
+                loading="eager"
+              />
+              <div className={styles.trackText}>
+                <strong>{track.title}</strong>
+                <small>{track.artist}</small>
+              </div>
+              <button
+                type="button"
+                className={styles.closeButton}
+                disabled={Boolean(addingPlaylistId)}
+                onClick={() => setIsPickerOpen(false)}
+                aria-label="Close playlist picker"
+              >
+                <IconX size={19} />
+              </button>
+            </header>
+
+            <label className={styles.search}>
+              <IconSearch size={18} aria-hidden="true" />
+              <input
+                ref={searchRef}
+                value={query}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setSelectedPlaylistIndex(null);
+                }}
+                onKeyDown={handlePickerKeyDown}
+                placeholder="Find a playlist"
+                aria-label="Find a playlist"
+              />
+            </label>
+
+            {error && <p className={styles.error}>{error}</p>}
+
+            <div className={styles.playlistList}>
+              {libraryState.status === "signed-out" ? (
+                <p className={styles.empty}>Sign in to YouTube Music to add songs.</p>
+              ) : playlists.length === 0 ? (
+                <p className={styles.empty}>
+                  {query ? "No matching playlists." : "No editable playlists were found."}
+                </p>
+              ) : (
+                playlists.map((playlist, index) => (
+                  <button
+                    key={playlist.id}
+                    ref={(element) => {
+                      playlistRefs.current[index] = element;
+                    }}
+                    type="button"
+                    className={`${styles.playlist} ${
+                      selectedPlaylistIndex === index ? styles.keyboardSelected : ""
+                    }`}
+                    disabled={Boolean(addingPlaylistId)}
+                    onMouseMove={() => setSelectedPlaylistIndex(null)}
+                    onClick={() => void addToPlaylist(playlist)}
+                  >
+                    <span className={styles.playlistArtwork}>
+                      {playlist.artworkUrl ? (
+                        <img src={playlist.artworkUrl} alt="" />
+                      ) : (
+                        <IconPlaylist size={24} aria-hidden="true" />
+                      )}
+                    </span>
+                    <span className={styles.playlistText}>
+                      <strong>{playlist.title}</strong>
+                      <span>{playlist.owner}</span>
+                    </span>
+                    {addingPlaylistId === playlist.id && (
+                      <span className={styles.adding}>Adding...</span>
+                    )}
+                  </button>
+                ))
+              )}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {toast && (
+        <div className={styles.toast} role="status">
+          {addingPlaylistId ? (
+            <IconLoader2
+              className={styles.toastLoadingIcon}
+              size={18}
+              aria-hidden="true"
+            />
+          ) : toast === "Already in playlist" ? (
+            <IconX size={16} aria-hidden="true" />
+          ) : (toast.startsWith("Added ") || toast === "Link copied") && (
+            <IconCheck size={18} aria-hidden="true" />
+          )}
+          <span>{toast}</span>
+        </div>
+      )}
+    </TrackContextMenuContext.Provider>
+  );
+}
