@@ -25,11 +25,11 @@ JustAnotherMusicClient brings YouTube Music to the desktop in a focused, native-
 <source
       width="831px"
       media="(prefers-color-scheme: dark)"
-      srcset="assets\img\screenshot01.png"
+      srcset="assets\img\Screenshot01.png"
     >
     <img 
       width="831px"
-      src="assets\img\screenshot01.png"
+      src="assets\img\Screenshot01.png"
     >
 
 ## Features
