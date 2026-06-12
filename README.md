@@ -5,18 +5,6 @@
     <img width="831px" src="assets\img\LogoHeader_LIGHT.png" />
   </picture>
 </p>
-
-<p align="center">
-  <a href="https://www.reddit.com/r/JustAnotherMusicC/">
-    <picture>
-          <source height="70px" media="(prefers-color-scheme: dark)" srcset="[https://user-images.githubusercontent.com/13122796/178032351-9d9d5619-8ef7-470a-9eec-2744ece54553.png](https://github.com/user-attachments/assets/05511c93-a52f-44ee-80ce-97b49cc974e0)" />
-      <img height="70px" src="https://github.com/user-attachments/assets/05511c93-a52f-44ee-80ce-97b49cc974e0" />
-    </picture>
-  </a>
-</p>
-<p></p>
-<br></br>
-
 A desktop YouTube Music client built with Tauri, React, and TypeScript for **Windows & (experimental) MacOs**.
 
 > **IMPORTANT**
@@ -39,6 +27,16 @@ JustAnotherMusicClient brings YouTube Music to the desktop in a focused, native-
       width="831px"
       src="assets\img\Screenshot01.png"
     >
+<p align="center">
+  <a href="https://www.reddit.com/r/JustAnotherMusicC/">
+    <picture>
+          <source height="70px" media="(prefers-color-scheme: dark)" srcset="[https://user-images.githubusercontent.com/13122796/178032351-9d9d5619-8ef7-470a-9eec-2744ece54553.png](https://github.com/user-attachments/assets/05511c93-a52f-44ee-80ce-97b49cc974e0)" />
+      <img height="70px" src="https://github.com/user-attachments/assets/05511c93-a52f-44ee-80ce-97b49cc974e0" />
+    </picture>
+  </a>
+</p>
+<p></p>
+<br></br>
 
 ## Features ✨
 | Feature  | Description |
