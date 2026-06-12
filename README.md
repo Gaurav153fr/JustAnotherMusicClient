@@ -5,7 +5,9 @@
     <img width="831px" src="assets\img\LogoHeader_LIGHT.png" />
   </picture>
 </p>
+
 A desktop YouTube Music client built with Tauri, React, and TypeScript for **Windows & (experimental) MacOs**.
+<p></p>
 
 > **IMPORTANT**
 >
