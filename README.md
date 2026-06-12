@@ -37,6 +37,7 @@ JustAnotherMusicClient brings YouTube Music to the desktop in a focused, native-
 | Feature  | Description |
 |---|---|
 | Multiple Tabs | Create multiple music tabs, each with its own playback queue, volume, and player state |
+| Add free | They aren't even fetched, so you won't waste any data |
 | Caching | Playlists, lyrics, and more are cached for significantly faster performance |
 | Recommendations | Home Tab with personalized song sugesstions and a "random" shuffle wheel, just like on the mobile client |
 | Synced Lyrics | Real-time synced lyrics, not even available on the official client |
@@ -66,7 +67,7 @@ Download the **newest available installer** from the [latest release](https://gi
 - **Artist Pages** with monthly listeners, playlists and popular songs alongside streams amount feature when clicking on the artist name, also integrate into the search results so that one can find artists
 - **Liked songs** playlist support
 - Fix Windows media player controls sometimes not working
-
+- **Music Video** support
 
 - Space to pause sometimes selects elements instead of pausing / resuming
 - Cap Too long Song names and make them smoothly move vertically
