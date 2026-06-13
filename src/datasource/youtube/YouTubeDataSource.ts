@@ -1,6 +1,6 @@
 import { ClientType, Innertube, Platform, Types } from "youtubei.js";
 import { logInternalDebug, logInternalError, logInternalInfo, logInternalWarn } from "../../internal/logging";
-import { DataSource } from "../DataSource";
+import { DataSource, type StreamData } from "../DataSource";
 import type { Track } from "../types";
 import { selectArtworkUrl } from "./artwork";
 import { tauriFetch } from "./tauriFetch";
@@ -460,7 +460,7 @@ export class YouTubeDataSource extends DataSource {
     throw new Error("Unable to resolve audio stream URL from YouTube response.");
   }
 
-  async getStreamData(track: Track): Promise<ArrayBuffer> {
+  async getStreamData(track: Track): Promise<StreamData> {
     logInternalInfo("YouTubeDataSource.getStreamData start", { trackId: track.id });
     
     const clients = [
@@ -479,7 +479,7 @@ export class YouTubeDataSource extends DataSource {
         
         const result = await this.tryDownloadWithClient(yt, track, name);
         logInternalInfo(`YouTubeDataSource.getStreamData success with ${name} client`, { trackId: track.id });
-        return result;
+        return { bytes: result };
       } catch (error: any) {
         errors.push({ client: name, error });
         logInternalWarn(`YouTubeDataSource.getStreamData ${name} client failed`, {

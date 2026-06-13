@@ -422,7 +422,7 @@ export class PlayerController {
       if (this.audioEngine.usesNativeAudio() && !audioData) {
         throw new Error("The data source does not support native audio playback.");
       }
-      await this.audioEngine.loadTrack(track.id, audioData);
+      await this.audioEngine.loadTrack(track.id, audioData?.bytes, audioData?.mimeType);
 
       this.loadedTrackId = track.id;
       if (this.pendingSeekTime !== null) {

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { IconX, IconPlus, IconVolume } from "@tabler/icons-react";
 import styles from "./MusicTabs.module.css";
 import { Tab } from "../types/tab";
+import { isLinux } from "../platform";
 
 const MAX_TAB_TITLE_LENGTH = 32;
 
@@ -123,7 +124,10 @@ export function MusicTabs({
 
   return (
     <div className={styles.tabsContainer}>
-      <div className={styles.tabsList} data-tauri-drag-region>
+      <div
+        className={`${styles.tabsList} ${isLinux ? styles.tabsListLinux : ""}`}
+        data-tauri-drag-region={isLinux ? undefined : ""}
+      >
         {tabs.map((tab) => {
           const title = getTabTitle(tab);
           return (

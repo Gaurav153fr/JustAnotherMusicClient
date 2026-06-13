@@ -9,7 +9,6 @@ use std::sync::Mutex;
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::Manager;
-use url::form_urlencoded;
 
 #[cfg(target_os = "macos")]
 use aes_gcm::{
@@ -820,6 +819,13 @@ struct CommandError {
     message: String,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AudioPayload {
+    body_base64: String,
+    mime_type: String,
+}
+
 #[derive(serde::Deserialize)]
 struct ProxyHttpRequestInput {
     url: String,
@@ -956,7 +962,7 @@ async fn fetch_audio_bytes(url: String, track_id: String) -> Result<Vec<u8>, Com
 }
 
 #[tauri::command]
-async fn fetch_youtube_music_audio(video_id: String) -> Result<Vec<u8>, CommandError> {
+async fn fetch_youtube_music_audio(video_id: String) -> Result<AudioPayload, CommandError> {
     let started_at = Instant::now();
     eprintln!(
         "[internal][tauri][info] fetch_youtube_music_audio start video_id={}",
@@ -965,14 +971,17 @@ async fn fetch_youtube_music_audio(video_id: String) -> Result<Vec<u8>, CommandE
 
     let client = reqwest::Client::new();
     
-    // Try multiple YouTube APIs in order of preference (ANDROID first for direct URLs)
+    // Mobile and TV clients are preferred because they are more likely to
+    // return direct media URLs that do not require player-JavaScript deciphering.
     let api_attempts = vec![
+        ("YouTube iOS", "https://www.youtube.com/youtubei/v1/player", create_ios_context()),
         ("YouTube ANDROID", "https://www.youtube.com/youtubei/v1/player", create_android_context()),
         ("YouTube TV", "https://www.youtube.com/youtubei/v1/player", create_tv_context()),
         ("YouTube WEB", "https://www.youtube.com/youtubei/v1/player", create_web_context()),
         ("YouTube Music WEB_REMIX", "https://music.youtube.com/youtubei/v1/player", create_web_remix_context()),
     ];
 
+    let mut failures = Vec::new();
     for (attempt_name, api_url, context) in api_attempts {
         eprintln!(
             "[internal][tauri][info] fetch_youtube_music_audio trying {} video_id={}",
@@ -985,7 +994,7 @@ async fn fetch_youtube_music_audio(video_id: String) -> Result<Vec<u8>, CommandE
                     "[internal][tauri][info] fetch_youtube_music_audio success video_id={} attempt={} bytes={} duration_ms={}",
                     video_id,
                     attempt_name,
-                    audio_bytes.len(),
+                    audio_bytes.body_base64.len(),
                     started_at.elapsed().as_millis()
                 );
                 return Ok(audio_bytes);
@@ -995,7 +1004,7 @@ async fn fetch_youtube_music_audio(video_id: String) -> Result<Vec<u8>, CommandE
                     "[internal][tauri][error] fetch_youtube_music_audio attempt failed video_id={} attempt={} error={}",
                     video_id, attempt_name, error.message
                 );
-                // Continue to next attempt
+                failures.push(format!("{attempt_name}: {}", error.message));
             }
         }
     }
@@ -1005,7 +1014,7 @@ async fn fetch_youtube_music_audio(video_id: String) -> Result<Vec<u8>, CommandE
         video_id
     );
     Err(CommandError {
-        message: "all YouTube API attempts failed".to_string(),
+        message: format!("all YouTube API attempts failed: {}", failures.join("; ")),
     })
 }
 
@@ -1030,7 +1039,7 @@ fn create_web_context() -> serde_json::Value {
     serde_json::json!({
         "client": {
             "clientName": "WEB",
-            "clientVersion": "2.20250506.01.00",
+            "clientVersion": "2.20260206.01.00",
             "hl": "en",
             "gl": "US",
             "platform": "DESKTOP",
@@ -1043,49 +1052,33 @@ fn create_web_context() -> serde_json::Value {
     })
 }
 
-// Parse YouTube signature cipher to extract URL with signature
-// Handles cases where YouTube returns signatureCipher instead of direct URL
-fn parse_signature_cipher(signature_cipher: &str) -> Result<String, String> {
-    // Parse the query string format: url=...&s=...&sp=...
-    let mut url = None;
-    let mut signature = None;
-    let mut signature_param: Option<String> = Some("sig".to_string());
-    
-    for (key, value) in form_urlencoded::parse(signature_cipher.as_bytes()) {
-        match key.as_ref() {
-            "url" => url = Some(value.into_owned()),
-            "s" => signature = Some(value.into_owned()),
-            "sp" => signature_param = Some(value.into_owned()),
-            _ => {}
+fn create_ios_context() -> serde_json::Value {
+    serde_json::json!({
+        "client": {
+            "clientName": "IOS",
+            "clientVersion": "20.11.6",
+            "hl": "en",
+            "gl": "US",
+            "deviceModel": "iPhone10,4",
+            "osName": "iPhone",
+            "osVersion": "16.7.7.20H330",
+            "userAgent": "com.google.ios.youtube/20.11.6 (iPhone10,4; U; CPU iOS 16_7_7 like Mac OS X)"
         }
-    }
-    
-    let mut url = url.ok_or("no url found in signature cipher")?;
-    
-    // If signature is present, append it to the URL
-    if let (Some(sig), Some(param)) = (signature, signature_param) {
-        // Parse the URL to check if it already has query parameters
-        if let Ok(mut parsed_url) = url::Url::parse(&url) {
-            parsed_url.query_pairs_mut().append_pair(&param, &sig);
-            url = parsed_url.to_string();
-        }
-    }
-    
-    Ok(url)
+    })
 }
 
 fn create_android_context() -> serde_json::Value {
     serde_json::json!({
         "client": {
             "clientName": "ANDROID",
-            "clientVersion": "19.09.37",
+            "clientVersion": "21.03.36",
             "hl": "en",
             "gl": "US",
             "platform": "MOBILE",
             "osName": "Android",
-            "osVersion": "12",
-            "androidSdkVersion": 31,
-            "userAgent": "com.google.android.youtube/19.09.37 (Linux; U; Android 12) gzip"
+            "osVersion": "16",
+            "androidSdkVersion": 36,
+            "userAgent": "com.google.android.youtube/21.03.36(Linux; U; Android 16; en_US; SM-S908E Build/TP1A.220624.014) gzip"
         }
     })
 }
@@ -1094,14 +1087,12 @@ fn create_tv_context() -> serde_json::Value {
     serde_json::json!({
         "client": {
             "clientName": "TVHTML5",
-            "clientVersion": "7.20250506.01.00",
+            "clientVersion": "7.20260311.12.00",
             "hl": "en",
             "gl": "US",
             "platform": "TV",
             "osName": "Linux",
-            "browserName": "Chrome",
-            "browserVersion": "135.0.0.0",
-            "userAgent": "Mozilla/5.0 (CrKey armv7l 1.5.16041) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/31.0.1650.0 Safari/537.36"
+            "userAgent": "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version"
         }
     })
 }
@@ -1112,7 +1103,7 @@ async fn try_youtube_api(
     context: &serde_json::Value,
     video_id: &str,
     attempt_name: &str,
-) -> Result<Vec<u8>, CommandError> {
+) -> Result<AudioPayload, CommandError> {
     let request_body = serde_json::json!({
         "context": context,
         "videoId": video_id,
@@ -1140,11 +1131,31 @@ async fn try_youtube_api(
         "https://www.youtube.com/"
     };
 
-    let user_agent = if attempt_name.contains("ANDROID") {
-        "com.google.android.youtube/19.09.37 (Linux; U; Android 12) gzip"
+    let user_agent = if attempt_name.contains("iOS") {
+        "com.google.ios.youtube/20.11.6 (iPhone10,4; U; CPU iOS 16_7_7 like Mac OS X)"
+    } else if attempt_name.contains("ANDROID") {
+        "com.google.android.youtube/21.03.36(Linux; U; Android 16; en_US; SM-S908E Build/TP1A.220624.014) gzip"
+    } else if attempt_name.contains("TV") {
+        "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version"
     } else {
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36"
     };
+    let client_name = if attempt_name.contains("iOS") {
+        "5"
+    } else if attempt_name.contains("ANDROID") {
+        "3"
+    } else if attempt_name.contains("Music") {
+        "67"
+    } else if attempt_name.contains("TV") {
+        "7"
+    } else {
+        "1"
+    };
+    let client_version = context
+        .get("client")
+        .and_then(|client| client.get("clientVersion"))
+        .and_then(|version| version.as_str())
+        .unwrap_or_default();
 
     eprintln!(
         "[internal][tauri][debug] YOUTUBE API REQUEST - {} - URL: {}",
@@ -1161,8 +1172,8 @@ async fn try_youtube_api(
         .header("User-Agent", user_agent)
         .header("Accept", "application/json")
         .header("Accept-Language", "en-US,en;q=0.9")
-        .header("X-YouTube-Client-Name", if attempt_name.contains("ANDROID") { "3" } else if attempt_name.contains("Music") { "1" } else if attempt_name.contains("TV") { "3" } else { "2" })
-        .header("X-YouTube-Client-Version", if attempt_name.contains("ANDROID") { "19.09.37" } else if attempt_name.contains("Music") { "1.20250506.00.00" } else if attempt_name.contains("TV") { "7.20250506.01.00" } else { "2.20250506.01.00" })
+        .header("X-YouTube-Client-Name", client_name)
+        .header("X-YouTube-Client-Version", client_version)
         .header("Referer", referer)
         .header("Origin", referer.trim_end_matches('/'))
         .body(request_body_str)
@@ -1354,8 +1365,11 @@ async fn try_youtube_api(
             }
         })?;
 
-    // Find the best audio format (handle both direct URLs and ciphered formats)
+    // Ciphered formats require YouTube's player JavaScript. This backend only
+    // accepts direct URLs instead of sending an invalid encrypted signature.
     let mut best_audio_url: Option<String> = None;
+    let mut best_mime_type: Option<String> = None;
+    let mut best_is_mp4 = false;
     let mut best_bitrate: u32 = 0;
 
     for format in streaming_data {
@@ -1365,30 +1379,17 @@ async fn try_youtube_api(
                 format_obj.get("bitrate").and_then(|b| b.as_u64()),
             ) {
                 if let Some(mime_str) = mime_type.as_str() {
-                    if mime_str.contains("audio") && bitrate > best_bitrate as u64 {
-                        // Try direct URL first
+                    let is_mp4 = mime_str.starts_with("audio/mp4");
+                    let is_better = is_mp4 && !best_is_mp4
+                        || is_mp4 == best_is_mp4 && bitrate > best_bitrate as u64;
+                    if mime_str.starts_with("audio/") && is_better {
                         if let Some(url) = format_obj.get("url").and_then(|u| u.as_str()) {
                             best_audio_url = Some(url.to_string());
+                            best_mime_type = Some(
+                                mime_str.split(';').next().unwrap_or("audio/mp4").to_string(),
+                            );
+                            best_is_mp4 = is_mp4;
                             best_bitrate = bitrate as u32;
-                        }
-                        // Handle ciphered format
-                        else if let Some(signature_cipher) = format_obj.get("signatureCipher").and_then(|c| c.as_str()) {
-                            match parse_signature_cipher(signature_cipher) {
-                                Ok(url) => {
-                                    best_audio_url = Some(url);
-                                    best_bitrate = bitrate as u32;
-                                    eprintln!(
-                                        "[internal][tauri][debug] Successfully deciphered audio URL for {}",
-                                        attempt_name
-                                    );
-                                }
-                                Err(error) => {
-                                    eprintln!(
-                                        "[internal][tauri][warn] Failed to decipher signature cipher for {}: {}",
-                                        attempt_name, error
-                                    );
-                                }
-                            }
                         }
                     }
                 }
@@ -1399,6 +1400,7 @@ async fn try_youtube_api(
     let audio_url = best_audio_url.ok_or_else(|| CommandError {
         message: "no suitable audio format found".to_string(),
     })?;
+    let mime_type = best_mime_type.unwrap_or_else(|| "audio/mp4".to_string());
 
     eprintln!(
         "[internal][tauri][debug] Attempting to download audio from URL (first 200 chars): {}",
@@ -1438,7 +1440,10 @@ async fn try_youtube_api(
         }
     })?;
 
-    Ok(audio_body.to_vec())
+    Ok(AudioPayload {
+        body_base64: STANDARD.encode(audio_body),
+        mime_type,
+    })
 }
 
 #[tauri::command]

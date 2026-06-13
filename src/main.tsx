@@ -4,8 +4,10 @@ import App from "./ui/App";
 import "./ui/styles/global.css";
 import { logInternalError, logInternalInfo } from "./internal/logging";
 import { applyPaperPcMode } from "./ui/settings/paperPcMode";
+import { applyPlatformAttributes } from "./ui/platform";
 
 logInternalInfo("main.bootstrap start");
+applyPlatformAttributes();
 applyPaperPcMode();
 
 window.addEventListener("error", (event) => {

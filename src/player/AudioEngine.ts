@@ -60,8 +60,9 @@ let playbackOwner: AudioEngine | null = null;
 
 function shouldUseNativeAudio(): boolean {
   const platform = `${navigator.platform} ${navigator.userAgent}`;
-  return /Linux/i.test(platform)
-    || (isTauri() && !import.meta.env.DEV && /Mac/i.test(platform));
+  return isTauri()
+    && !import.meta.env.DEV
+    && /(Linux|Mac)/i.test(platform);
 }
 
 function detectAudioMimeType(bytes: Uint8Array): string {
@@ -131,12 +132,12 @@ export class AudioEngine {
     return this.useNativeAudio;
   }
 
-  async loadTrack(videoId: string, audioData?: ArrayBuffer): Promise<void> {
+  async loadTrack(videoId: string, audioData?: ArrayBuffer, mimeType?: string): Promise<void> {
     if (this.useNativeAudio) {
       if (!audioData) {
         throw new Error("Native playback requires downloaded audio data.");
       }
-      await this.loadNativeAudio(videoId, audioData);
+      await this.loadNativeAudio(videoId, audioData, mimeType);
       return;
     }
 
@@ -296,12 +297,16 @@ export class AudioEngine {
     return this.player?.getDuration() ?? 0;
   }
 
-  private async loadNativeAudio(videoId: string, audioData: ArrayBuffer): Promise<void> {
+  private async loadNativeAudio(
+    videoId: string,
+    audioData: ArrayBuffer,
+    mimeType?: string,
+  ): Promise<void> {
     const requestId = ++this.loadRequestId;
     this.releaseNativeAudio();
 
     const bytes = new Uint8Array(audioData);
-    const blob = new Blob([bytes], { type: detectAudioMimeType(bytes) });
+    const blob = new Blob([bytes], { type: mimeType || detectAudioMimeType(bytes) });
     const objectUrl = URL.createObjectURL(blob);
     const audio = new Audio();
     audio.preload = "auto";

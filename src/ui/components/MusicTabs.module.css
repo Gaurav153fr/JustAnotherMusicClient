@@ -19,6 +19,11 @@
   cursor: grabbing;
 }
 
+.tabsListLinux,
+.tabsListLinux:active {
+  cursor: default;
+}
+
 .tabsList::-webkit-scrollbar {
   display: none;
 }

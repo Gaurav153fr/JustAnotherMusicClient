@@ -2,12 +2,26 @@ import { invoke } from "@tauri-apps/api/core";
 import { ClientType, Innertube, Platform, Types, YTNodes } from "youtubei.js";
 import { clearCache, getCachedJson, setCachedJson } from "../../internal/cache";
 import { logInternalDebug, logInternalError, logInternalInfo, logInternalWarn } from "../../internal/logging";
-import { DataSource } from "../DataSource";
+import { DataSource, type StreamData } from "../DataSource";
 import type { Album, AuthPrompt, LibrarySnapshot, Lyrics, Playlist, Track } from "../types";
 import { getVideoArtworkFallback, selectArtworkUrl } from "./artwork";
 import { tauriFetch } from "./tauriFetch";
 
 type ClientLabel = "music" | "web";
+type NativeAudioPayload = {
+  bodyBase64: string;
+  mimeType: string;
+};
+
+function decodeBase64(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+}
+
 type MusicItem = {
   id?: string;
   title?: string | { toString(): string };
@@ -1452,17 +1466,15 @@ export class YouTubeMusicDataSource extends DataSource {
     throw new Error("Unable to resolve a playable YouTube audio stream.");
   }
 
-  async getStreamData(track: Track): Promise<ArrayBuffer> {
+  async getStreamData(track: Track): Promise<StreamData> {
     logInternalInfo("YouTubeMusicDataSource.getStreamData download start", {
       trackId: track.id,
     });
 
-    const downloadedBytes = await invoke<number[] | Uint8Array>("fetch_youtube_music_audio", {
+    const payload = await invoke<NativeAudioPayload>("fetch_youtube_music_audio", {
       videoId: track.id,
     });
-    const audioBytes = downloadedBytes instanceof Uint8Array
-      ? downloadedBytes
-      : new Uint8Array(downloadedBytes);
+    const audioBytes = decodeBase64(payload.bodyBase64);
     if (audioBytes.byteLength === 0) {
       throw new Error("Audio download returned no data.");
     }
@@ -1470,11 +1482,15 @@ export class YouTubeMusicDataSource extends DataSource {
     logInternalInfo("YouTubeMusicDataSource.getStreamData download success", {
       trackId: track.id,
       byteLength: audioBytes.byteLength,
+      mimeType: payload.mimeType,
     });
 
-    return audioBytes.buffer.slice(
-      audioBytes.byteOffset,
-      audioBytes.byteOffset + audioBytes.byteLength,
-    ) as ArrayBuffer;
+    return {
+      bytes: audioBytes.buffer.slice(
+        audioBytes.byteOffset,
+        audioBytes.byteOffset + audioBytes.byteLength,
+      ) as ArrayBuffer,
+      mimeType: payload.mimeType,
+    };
   }
 }
