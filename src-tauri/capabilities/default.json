@@ -24,14 +24,23 @@
   "command": {
     "allow": [
       "greet",
-      "quit_app", 
+      "quit_app",
+      "frontend_log",
+      "cache_get",
+      "cache_set",
+      "cache_stats",
+      "cache_set_max_bytes",
+      "cache_clear",
       "fetch_audio_bytes",
       "fetch_youtube_music_audio",
       "proxy_http_request",
       "update_windows_media_session",
       "save_youtube_credentials",
       "load_youtube_credentials",
-      "delete_youtube_credentials"
+      "delete_youtube_credentials",
+      "load_youtube_music_cookie",
+      "sign_in_youtube_music",
+      "delete_youtube_music_cookie"
     ]
   }
 }
