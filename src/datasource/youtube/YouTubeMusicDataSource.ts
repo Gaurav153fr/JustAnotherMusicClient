@@ -1453,54 +1453,12 @@ export class YouTubeMusicDataSource extends DataSource {
   }
 
   async getStreamData(track: Track): Promise<ArrayBuffer> {
-    let streamUrl: string | null = null;
-
-    for (const label of ["music", "web"] as ClientLabel[]) {
-      try {
-        const yt = await this.getClient(label);
-        const info = await yt.getBasicInfo(track.id);
-        const format = info.streaming_data?.adaptive_formats
-          ?.filter((candidate: any) => candidate.mime_type?.includes("audio/mp4"))
-          .sort((left: any, right: any) => (right.bitrate ?? 0) - (left.bitrate ?? 0))[0];
-        if (!format) {
-          throw new Error("YouTube returned no MP4 audio format.");
-        }
-
-        streamUrl = typeof (format as any).url === "string"
-          ? (format as any).url
-          : await format.decipher(yt.session.player);
-        if (!streamUrl) {
-          throw new Error("YouTube returned an empty MP4 audio URL.");
-        }
-
-        logInternalInfo("YouTubeMusicDataSource.getStreamData format selected", {
-          trackId: track.id,
-          client: label,
-          itag: (format as any).itag ?? null,
-          mimeType: (format as any).mime_type ?? null,
-          bitrate: (format as any).bitrate ?? null,
-        });
-        break;
-      } catch (error) {
-        logInternalWarn("YouTubeMusicDataSource.getStreamData client failed", {
-          trackId: track.id,
-          client: label,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
-
-    if (!streamUrl) {
-      throw new Error("Unable to resolve a macOS-compatible MP4 audio stream.");
-    }
-
     logInternalInfo("YouTubeMusicDataSource.getStreamData download start", {
       trackId: track.id,
     });
 
-    const downloadedBytes = await invoke<number[] | Uint8Array>("fetch_audio_bytes", {
-      url: streamUrl,
-      trackId: track.id,
+    const downloadedBytes = await invoke<number[] | Uint8Array>("fetch_youtube_music_audio", {
+      videoId: track.id,
     });
     const audioBytes = downloadedBytes instanceof Uint8Array
       ? downloadedBytes
@@ -1508,20 +1466,10 @@ export class YouTubeMusicDataSource extends DataSource {
     if (audioBytes.byteLength === 0) {
       throw new Error("Audio download returned no data.");
     }
-    const containerType = audioBytes.byteLength >= 12
-      ? String.fromCharCode(...audioBytes.slice(4, 8))
-      : "";
-    if (containerType !== "ftyp") {
-      const preview = new TextDecoder()
-        .decode(audioBytes.slice(0, Math.min(audioBytes.byteLength, 120)))
-        .replace(/\s+/g, " ");
-      throw new Error(`Audio download was not an MP4 file. Response started with: ${preview}`);
-    }
 
     logInternalInfo("YouTubeMusicDataSource.getStreamData download success", {
       trackId: track.id,
       byteLength: audioBytes.byteLength,
-      containerType,
     });
 
     return audioBytes.buffer.slice(

@@ -1408,7 +1408,7 @@ async fn try_youtube_api(
     // Download the audio
     let audio_response = client
         .get(&audio_url)
-        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36")
+        .header("User-Agent", user_agent)
         .header("Accept", "*/*")
         .header("Accept-Language", "en-US,en;q=0.9")
         .header("Accept-Encoding", "identity;q=1, *;q=0")

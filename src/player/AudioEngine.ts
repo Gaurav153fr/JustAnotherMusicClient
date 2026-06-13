@@ -1,3 +1,4 @@
+import { isTauri } from "@tauri-apps/api/core";
 import { logInternalError, logInternalInfo } from "../internal/logging";
 
 type YouTubePlayerEvent = {
@@ -58,7 +59,9 @@ let playbackClaimId = 0;
 let playbackOwner: AudioEngine | null = null;
 
 function shouldUseNativeAudio(): boolean {
-  return /Linux/i.test(`${navigator.platform} ${navigator.userAgent}`);
+  const platform = `${navigator.platform} ${navigator.userAgent}`;
+  return /Linux/i.test(platform)
+    || (isTauri() && !import.meta.env.DEV && /Mac/i.test(platform));
 }
 
 function detectAudioMimeType(bytes: Uint8Array): string {
