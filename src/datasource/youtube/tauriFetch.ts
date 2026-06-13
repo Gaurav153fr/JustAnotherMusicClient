@@ -215,7 +215,12 @@ export async function tauriFetch(input: RequestInfo | URL, init?: RequestInit): 
       durationMs: Math.round(performance.now() - startedAt),
       success: proxyResponse.status >= 200 && proxyResponse.status < 300,
     });
-    return new Response(bodyBytes, {
+    const responseBody = proxyResponse.status === 204
+      || proxyResponse.status === 205
+      || proxyResponse.status === 304
+      ? null
+      : bodyBytes;
+    return new Response(responseBody, {
       status: proxyResponse.status,
       headers: proxyResponse.headers,
     });

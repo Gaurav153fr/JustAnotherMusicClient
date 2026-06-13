@@ -74,7 +74,7 @@ Download the **newest available installer** from the [latest release](https://gi
 - **Liked songs** playlist support
 - Fix Windows media player controls sometimes not working
 - **Music Video** support
-
+- Add to startup option
 - Space to pause sometimes selects elements instead of pausing / resuming
 - Cap Too long Song names and make them smoothly move vertically
 

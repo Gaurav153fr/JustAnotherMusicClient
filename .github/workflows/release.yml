@@ -18,10 +18,20 @@ jobs:
           - name: Windows
             os: windows-latest
             bundles: msi,nsis
+            rust_target: ""
+            build_args: --bundles msi,nsis
             apple_signing_identity: ""
-          - name: macOS
+          - name: macOS Apple Silicon
             os: macos-latest
             bundles: dmg
+            rust_target: aarch64-apple-darwin
+            build_args: --target aarch64-apple-darwin --bundles dmg
+            apple_signing_identity: "-"
+          - name: macOS Intel
+            os: macos-13
+            bundles: dmg
+            rust_target: x86_64-apple-darwin
+            build_args: --target x86_64-apple-darwin --bundles dmg
             apple_signing_identity: "-"
     runs-on: ${{ matrix.platform.os }}
 
@@ -37,6 +47,10 @@ jobs:
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Add Rust target
+        if: matrix.platform.rust_target != ''
+        run: rustup target add ${{ matrix.platform.rust_target }}
 
       - name: Cache Rust build
         uses: swatinem/rust-cache@v2
@@ -58,7 +72,8 @@ jobs:
             Desktop installers for Just Another Music Client.
 
             Windows: download the `.msi` or NSIS setup `.exe`.
-            macOS: download the `.dmg`.
+            macOS: download the Apple Silicon `.dmg` for M-series Macs or the
+            Intel `.dmg` for older Intel Macs.
 
             ## macOS notice
 
@@ -72,15 +87,21 @@ jobs:
             This popup is expected.
           releaseDraft: false
           prerelease: false
-          args: --bundles ${{ matrix.platform.bundles }}
+          args: ${{ matrix.platform.build_args }}
 
       - name: Verify macOS DMG and app signature
-        if: matrix.platform.name == 'macOS'
+        if: startsWith(matrix.platform.name, 'macOS')
         shell: bash
         run: |
           set -euo pipefail
 
-          dmg_path="$(find src-tauri/target/release/bundle/dmg -maxdepth 1 -name '*.dmg' -print -quit)"
+          if [ -n "${{ matrix.platform.rust_target }}" ]; then
+            bundle_dir="src-tauri/target/${{ matrix.platform.rust_target }}/release/bundle/dmg"
+          else
+            bundle_dir="src-tauri/target/release/bundle/dmg"
+          fi
+
+          dmg_path="$(find "$bundle_dir" -maxdepth 1 -name '*.dmg' -print -quit)"
           test -n "$dmg_path"
           hdiutil verify "$dmg_path"
 

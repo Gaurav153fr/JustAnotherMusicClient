@@ -57,10 +57,6 @@ const audioEngines = new Set<AudioEngine>();
 let playbackClaimId = 0;
 let playbackOwner: AudioEngine | null = null;
 
-function isMacOS(): boolean {
-  return /Macintosh|Mac OS X/.test(navigator.userAgent);
-}
-
 function detectAudioMimeType(bytes: Uint8Array): string {
   if (
     bytes.length >= 4
@@ -102,7 +98,7 @@ function loadYouTubeIframeApi(): Promise<void> {
 }
 
 export class AudioEngine {
-  private readonly useNativeAudio = isMacOS();
+  private readonly useNativeAudio = false;
   private player: YouTubePlayer | null = null;
   private playerPromise: Promise<YouTubePlayer> | null = null;
   private audio: HTMLAudioElement | null = null;
