@@ -4,6 +4,7 @@ import {
   IconDatabase,
   IconLogin,
   IconLogout,
+  IconLeaf,
   IconRefresh,
   IconStar,
   IconTrash,
@@ -18,6 +19,7 @@ import {
   type CacheStats,
 } from "../../internal/cache";
 import type { LibraryController, LibraryState } from "../../player/LibraryController";
+import { setPaperPcMode, usePaperPcMode } from "../settings/paperPcMode";
 import styles from "./SettingsPage.module.css";
 
 const GITHUB_REPOSITORY_URL = "https://github.com/2latemc/JustAnotherMusicClient";
@@ -40,6 +42,7 @@ export function SettingsPage({
   const [cacheSizeGb, setCacheSizeGb] = useState(DEFAULT_CACHE_SIZE_GB.toString());
   const [cacheBusy, setCacheBusy] = useState(false);
   const [cacheError, setCacheError] = useState<string | null>(null);
+  const paperPcMode = usePaperPcMode();
   const account = libraryState.library?.account;
   const isSignedIn = libraryState.status === "ready" && account;
   const authBusy = libraryState.status === "restoring"
@@ -234,6 +237,30 @@ export function SettingsPage({
         </div>
 
         {cacheError && <p className={styles.error}>{cacheError}</p>}
+      </section>
+
+      <section className={styles.card} aria-labelledby="performance-settings-title">
+        <div className={styles.cardHeader}>
+          <div>
+            <h2 id="performance-settings-title">Performance</h2>
+            <p>Reduce GPU-heavy visual effects on older or low-power computers.</p>
+          </div>
+          <IconLeaf className={styles.cardIcon} size={22} />
+        </div>
+
+        <label className={styles.toggleRow}>
+          <span className={styles.toggleDescription}>
+            <strong>Potato PC mode</strong>
+            <span>Disables animations, blur effects, and the animated star background.</span>
+          </span>
+          <input
+            className={styles.toggleInput}
+            type="checkbox"
+            checked={paperPcMode}
+            onChange={(event) => setPaperPcMode(event.target.checked)}
+          />
+          <span className={styles.toggle} aria-hidden="true" />
+        </label>
       </section>
 
       <section className={styles.card} aria-labelledby="onboarding-settings-title">

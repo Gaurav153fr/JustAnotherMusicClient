@@ -278,6 +278,74 @@
   font-size: var(--font-size-sm);
 }
 
+.toggleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding-top: var(--spacing-lg);
+  cursor: pointer;
+}
+
+.toggleDescription {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.toggleDescription strong {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-md);
+}
+
+.toggleInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.toggle {
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+  position: relative;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-bg);
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.toggle::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-text-secondary);
+  transition: transform var(--transition-fast), background var(--transition-fast);
+}
+
+.toggleInput:checked + .toggle {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+}
+
+.toggleInput:checked + .toggle::after {
+  background: white;
+  transform: translateX(20px);
+}
+
+.toggleInput:focus-visible + .toggle {
+  outline: 2px solid white;
+  outline-offset: 2px;
+}
+
 @media (max-width: 720px) {
   .page {
     padding-top: 32px;

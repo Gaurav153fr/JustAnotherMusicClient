@@ -11,6 +11,10 @@
     #020202;
 }
 
+:global(html[data-paper-pc]) .layout {
+  background: #020202;
+}
+
 .starField {
   position: absolute;
   inset: 0;

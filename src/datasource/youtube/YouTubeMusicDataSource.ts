@@ -426,8 +426,12 @@ export class YouTubeMusicDataSource extends DataSource {
     const parsed = response as ParsedMusicResponse;
     const detailHeader = parsed.contents_memo?.getType(YTNodes.MusicDetailHeader)?.[0] as {
       thumbnails?: Array<{ url?: string; width?: number; height?: number }>;
+      thumbnail?: {
+        contents?: Array<{ url?: string; width?: number; height?: number }>;
+      };
     } | undefined;
     const responsiveHeader = parsed.contents_memo?.getType(YTNodes.MusicResponsiveHeader)?.[0] as {
+      thumbnails?: Array<{ url?: string; width?: number; height?: number }>;
       thumbnail?: {
         contents?: Array<{ url?: string; width?: number; height?: number }>;
       };
@@ -435,6 +439,8 @@ export class YouTubeMusicDataSource extends DataSource {
 
     return selectArtworkUrl(
       detailHeader?.thumbnails,
+      detailHeader?.thumbnail?.contents,
+      responsiveHeader?.thumbnails,
       responsiveHeader?.thumbnail?.contents,
     );
   }
@@ -660,11 +666,11 @@ export class YouTubeMusicDataSource extends DataSource {
   }
 
   getCachedLibrary(): Promise<LibrarySnapshot | null> {
-    return getCachedJson<LibrarySnapshot>("youtube-music:library:v2");
+    return getCachedJson<LibrarySnapshot>("youtube-music:library:v3");
   }
 
   async getLibrary(onUpdate?: (library: LibrarySnapshot) => void): Promise<LibrarySnapshot> {
-    const cacheKey = "youtube-music:library:v2";
+    const cacheKey = "youtube-music:library:v3";
     const cached = await getCachedJson<LibrarySnapshot>(cacheKey);
 
     if (cached) {
@@ -768,7 +774,7 @@ export class YouTubeMusicDataSource extends DataSource {
     const cacheKey = `youtube-music:album-tracks:v3:${album.id}`;
     const cached = await getCachedJson<Track[]>(cacheKey);
 
-    if (cached) {
+    if (cached?.length) {
       globalThis.setTimeout(() => {
         void this.refreshAlbumTracks(album, cacheKey)
           .then(({ changed, value }) => {
@@ -782,6 +788,12 @@ export class YouTubeMusicDataSource extends DataSource {
           });
       }, 0);
       return cached;
+    }
+
+    if (cached) {
+      logInternalWarn("YouTubeMusicDataSource.getAlbumTracks ignoring empty cache entry", {
+        albumId: album.id,
+      });
     }
 
     return (await this.refreshAlbumTracks(album, cacheKey)).value;
@@ -800,7 +812,9 @@ export class YouTubeMusicDataSource extends DataSource {
     }
 
     const value = await refresh;
-    const changed = await setCachedJson(cacheKey, value);
+    const changed = value.length > 0
+      ? await setCachedJson(cacheKey, value)
+      : false;
     return { changed, value };
   }
 
@@ -810,12 +824,16 @@ export class YouTubeMusicDataSource extends DataSource {
     const initialItems = albumPage.contents
       .filter((item) => item.item_type === "song" || item.item_type === "video") as unknown as MusicItem[];
     const continuedTracks = await this.collectAllTracks(client, albumPage.page);
-    return this.uniqueById([
+    const tracks = this.uniqueById([
       ...initialItems
         .map((item) => this.toTrack(item))
         .filter((item): item is Track => Boolean(item)),
       ...continuedTracks,
     ]);
+    if (tracks.length === 0) {
+      throw new Error(`YouTube Music returned no tracks for album ${album.id}.`);
+    }
+    return tracks;
   }
 
   async getPlaylistTracks(playlist: Playlist, onUpdate?: (tracks: Track[]) => void): Promise<Track[]> {
@@ -1435,7 +1453,47 @@ export class YouTubeMusicDataSource extends DataSource {
   }
 
   async getStreamData(track: Track): Promise<ArrayBuffer> {
-    const streamUrl = await this.getStreamUrl(track);
+    let streamUrl: string | null = null;
+
+    for (const label of ["music", "web"] as ClientLabel[]) {
+      try {
+        const yt = await this.getClient(label);
+        const info = await yt.getBasicInfo(track.id);
+        const format = info.streaming_data?.adaptive_formats
+          ?.filter((candidate: any) => candidate.mime_type?.includes("audio/mp4"))
+          .sort((left: any, right: any) => (right.bitrate ?? 0) - (left.bitrate ?? 0))[0];
+        if (!format) {
+          throw new Error("YouTube returned no MP4 audio format.");
+        }
+
+        streamUrl = typeof (format as any).url === "string"
+          ? (format as any).url
+          : await format.decipher(yt.session.player);
+        if (!streamUrl) {
+          throw new Error("YouTube returned an empty MP4 audio URL.");
+        }
+
+        logInternalInfo("YouTubeMusicDataSource.getStreamData format selected", {
+          trackId: track.id,
+          client: label,
+          itag: (format as any).itag ?? null,
+          mimeType: (format as any).mime_type ?? null,
+          bitrate: (format as any).bitrate ?? null,
+        });
+        break;
+      } catch (error) {
+        logInternalWarn("YouTubeMusicDataSource.getStreamData client failed", {
+          trackId: track.id,
+          client: label,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    if (!streamUrl) {
+      throw new Error("Unable to resolve a macOS-compatible MP4 audio stream.");
+    }
+
     logInternalInfo("YouTubeMusicDataSource.getStreamData download start", {
       trackId: track.id,
     });
@@ -1450,10 +1508,20 @@ export class YouTubeMusicDataSource extends DataSource {
     if (audioBytes.byteLength === 0) {
       throw new Error("Audio download returned no data.");
     }
+    const containerType = audioBytes.byteLength >= 12
+      ? String.fromCharCode(...audioBytes.slice(4, 8))
+      : "";
+    if (containerType !== "ftyp") {
+      const preview = new TextDecoder()
+        .decode(audioBytes.slice(0, Math.min(audioBytes.byteLength, 120)))
+        .replace(/\s+/g, " ");
+      throw new Error(`Audio download was not an MP4 file. Response started with: ${preview}`);
+    }
 
     logInternalInfo("YouTubeMusicDataSource.getStreamData download success", {
       trackId: track.id,
       byteLength: audioBytes.byteLength,
+      containerType,
     });
 
     return audioBytes.buffer.slice(

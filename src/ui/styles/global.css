@@ -107,3 +107,24 @@ textarea,
   outline-offset: 2px;
 }
 
+html[data-paper-pc] {
+  --color-bg: #070707;
+  --color-bg-elevated: #181818;
+  --color-bg-overlay: #262626;
+  --transition-fast: 0s;
+  --transition-base: 0s;
+  --transition-slow: 0s;
+}
+
+html[data-paper-pc] *,
+html[data-paper-pc] *::before,
+html[data-paper-pc] *::after {
+  animation: none !important;
+  transition: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  filter: none !important;
+  box-shadow: none !important;
+  scroll-behavior: auto !important;
+}
+

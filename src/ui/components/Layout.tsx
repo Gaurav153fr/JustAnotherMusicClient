@@ -4,6 +4,7 @@ import { SearchBar } from "./SearchBar";
 import { Sidebar } from "./Sidebar";
 import { StarField } from "./StarField";
 import type { Album, Playlist } from "../../datasource/types";
+import { usePaperPcMode } from "../settings/paperPcMode";
 
 interface LayoutProps {
   children: ReactNode;
@@ -28,9 +29,11 @@ export function Layout({
   onOpenSearch,
   fullBleedContent = false,
 }: LayoutProps) {
+  const paperPcMode = usePaperPcMode();
+
   return (
     <div className={styles.layout}>
-      <StarField />
+      {!paperPcMode && <StarField />}
       <div className={styles.mainContent}>
         <Sidebar
           width={sidebarWidth}
