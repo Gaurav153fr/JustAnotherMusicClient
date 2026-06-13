@@ -31,6 +31,8 @@ const YOUTUBE_COOKIE_ENCRYPTION_KEY_USER: &str = "youtube-music-cookie-encryptio
 const YOUTUBE_COOKIE_ENCRYPTED_FILE: &str = "youtube-music-session-v1.bin";
 const YOUTUBE_LOGIN_WINDOW: &str = "youtube-music-login";
 const YOUTUBE_LOGIN_URL: &str = "https://accounts.google.com/ServiceLogin?service=youtube&continue=https%3A%2F%2Fmusic.youtube.com%2F";
+const YOUTUBE_PLAYER_API_URL: &str = "https://www.youtube.com/youtubei/v1/player?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8&prettyPrint=false";
+const YOUTUBE_MUSIC_PLAYER_API_URL: &str = "https://music.youtube.com/youtubei/v1/player?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8&prettyPrint=false";
 #[cfg(target_os = "macos")]
 const MACOS_LOGIN_USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15";
 const YOUTUBE_COOKIE_CHUNK_SIZE: usize = 900;
@@ -974,11 +976,11 @@ async fn fetch_youtube_music_audio(video_id: String) -> Result<AudioPayload, Com
     // Mobile and TV clients are preferred because they are more likely to
     // return direct media URLs that do not require player-JavaScript deciphering.
     let api_attempts = vec![
-        ("YouTube iOS", "https://www.youtube.com/youtubei/v1/player", create_ios_context()),
-        ("YouTube ANDROID", "https://www.youtube.com/youtubei/v1/player", create_android_context()),
-        ("YouTube TV", "https://www.youtube.com/youtubei/v1/player", create_tv_context()),
-        ("YouTube WEB", "https://www.youtube.com/youtubei/v1/player", create_web_context()),
-        ("YouTube Music WEB_REMIX", "https://music.youtube.com/youtubei/v1/player", create_web_remix_context()),
+        ("YouTube iOS", YOUTUBE_PLAYER_API_URL, create_ios_context()),
+        ("YouTube ANDROID", YOUTUBE_PLAYER_API_URL, create_android_context()),
+        ("YouTube TV", YOUTUBE_PLAYER_API_URL, create_tv_context()),
+        ("YouTube WEB", YOUTUBE_PLAYER_API_URL, create_web_context()),
+        ("YouTube Music WEB_REMIX", YOUTUBE_MUSIC_PLAYER_API_URL, create_web_remix_context()),
     ];
 
     let mut failures = Vec::new();
@@ -1108,15 +1110,7 @@ async fn try_youtube_api(
         "context": context,
         "videoId": video_id,
         "racyCheckOk": true,
-        "contentCheckOk": true,
-        "playbackContext": {
-            "contentPlaybackContext": {
-                "autoCaptionsDefaultOn": false,
-                "autonavState": "OFF",
-                "html5Preference": "HTML5_PREF_WANTS",
-                "lactMilliseconds": "12345"
-            }
-        }
+        "contentCheckOk": true
     });
 
     let request_body_str = serde_json::to_string(&request_body).map_err(|error| {
@@ -1185,17 +1179,20 @@ async fn try_youtube_api(
             }
         })?;
 
-    if !response.status().is_success() {
-        return Err(CommandError {
-            message: format!("api request returned {}", response.status()),
-        });
-    }
-
+    let response_status = response.status();
     let response_text = response.text().await.map_err(|error| {
         CommandError {
             message: format!("response read failed: {error}"),
         }
     })?;
+    if !response_status.is_success() {
+        let response_preview = response_text.chars().take(500).collect::<String>();
+        return Err(CommandError {
+            message: format!(
+                "api request returned {response_status}: {response_preview}"
+            ),
+        });
+    }
 
     // LOG THE ENTIRE YOUTUBE API RESPONSE
     eprintln!(
@@ -1222,6 +1219,10 @@ async fn try_youtube_api(
             message: format!("json parse failed: {error}"),
         }
     })?;
+    let visitor_data = response_json
+        .get("responseContext")
+        .and_then(|context| context.get("visitorData"))
+        .and_then(|value| value.as_str());
 
     // LOG PARSED RESPONSE STRUCTURE
     eprintln!(
@@ -1408,18 +1409,28 @@ async fn try_youtube_api(
     );
 
     // Download the audio
-    let audio_response = client
+    let mut audio_request = client
         .get(&audio_url)
         .header("User-Agent", user_agent)
         .header("Accept", "*/*")
         .header("Accept-Language", "en-US,en;q=0.9")
         .header("Accept-Encoding", "identity;q=1, *;q=0")
-        .header("Range", "bytes=0-")
-        .header("Referer", referer)
-        .header("Origin", referer.trim_end_matches('/'))
-        .header("Sec-Fetch-Dest", "audio")
-        .header("Sec-Fetch-Mode", "no-cors")
-        .header("Sec-Fetch-Site", "cross-site")
+        .header("Range", "bytes=0-");
+
+    if let Some(visitor_data) = visitor_data {
+        audio_request = audio_request.header("X-Goog-Visitor-Id", visitor_data);
+    }
+
+    if !attempt_name.contains("iOS") && !attempt_name.contains("ANDROID") {
+        audio_request = audio_request
+            .header("Referer", referer)
+            .header("Origin", referer.trim_end_matches('/'))
+            .header("Sec-Fetch-Dest", "audio")
+            .header("Sec-Fetch-Mode", "no-cors")
+            .header("Sec-Fetch-Site", "cross-site");
+    }
+
+    let audio_response = audio_request
         .send()
         .await
         .map_err(|error| {

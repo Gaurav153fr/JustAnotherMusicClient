@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { isLinux } from "../platform";
 
 const STORAGE_KEY = "paper-pc-mode";
 const CHANGE_EVENT = "paper-pc-mode-change";
@@ -23,6 +24,12 @@ export function applyPaperPcMode(enabled = readPaperPcMode()) {
 
 export function setPaperPcMode(enabled: boolean) {
   localStorage.setItem(STORAGE_KEY, String(enabled));
+
+  if (isLinux) {
+    window.location.reload();
+    return;
+  }
+
   applyPaperPcMode(enabled);
   window.dispatchEvent(new Event(CHANGE_EVENT));
 }
