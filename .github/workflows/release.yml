@@ -28,7 +28,7 @@ jobs:
             build_args: --target aarch64-apple-darwin --bundles dmg
             apple_signing_identity: "-"
           - name: macOS Intel
-            os: macos-13
+            os: macos-15-intel
             bundles: dmg
             rust_target: x86_64-apple-darwin
             build_args: --target x86_64-apple-darwin --bundles dmg
@@ -85,7 +85,7 @@ jobs:
 
             ${{ steps.release_metadata.outputs.notify_marker }}
 
-            Windows: download the `.msi` or NSIS setup `.exe`, or the portable `.exe` (no install needed).
+            Windows: download the `.msi` or NSIS setup `.exe`, or the portable `.exe` (no install needed — requires WebView2, included with Windows 10/11).
             macOS: download the Apple Silicon `.dmg` for M-series Macs or the
             Intel `.dmg` for older Intel Macs.
 
