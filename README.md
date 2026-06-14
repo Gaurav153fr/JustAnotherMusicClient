@@ -74,17 +74,16 @@ Download the **newest available installer** from the [latest release](https://gi
 - **Full Linux and MacOS support**
 - **Better lyrics consistency** (some songs still don't have them)
 - **Artist Pages** with monthly listeners, playlists and popular songs alongside streams amount feature when clicking on the artist name, also integrate into the search results so that one can find artists
-- **Liked songs** playlist support
-- **Discord RCP** is coming
+- ~~Liked songs playlist support~~
+- ~~Discord RCP is coming~~
 - **App Auto-Update** so that you don't manually have to check for changes
 - Maximize Button + An option for Windows-style window controls
-- Start App on boot option
+- ~~Start App on boot option~~
 - Raycast support with app specific URLs
 - Fix Windows media player controls sometimes not working
 - **Music Video** support
-- Add to startup option
 - Space to pause sometimes selects elements instead of pausing / resuming
-- Cap Too long Song names and make them smoothly move vertically
+- ~~Cap Too long Song names and make them smoothly move vertically~~
 
 ## Platform Support 💻
 
