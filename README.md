@@ -89,7 +89,7 @@ Download the **newest available installer** from the [latest release](https://gi
 ## Platform Support 💻
 
 - **Windows** is the primary supported platform.
-- **macOS** support is experimental, currently there are heavy playback issues on MacOS that I am actively working on.
+- **macOS** does not work at this point but will soon
 - **Linux** support is in the working. This should take a few days until it's implemented! 
 ### MacOs Issues
 **MacOs may prompt you with a Keychain popup asking for permission.** The app stores one encryption key in its own Keychain entry. Your YouTube Music session is encrypted with that key before it is saved in the app data directory.
