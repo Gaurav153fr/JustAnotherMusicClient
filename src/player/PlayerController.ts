@@ -169,8 +169,19 @@ export class PlayerController {
         }
       }
 
-      const track = await this.dataSource.getTrack(videoId);
+      const fetchedTrack = await this.dataSource.getTrack(videoId);
       if (requestId !== this.playTrackRequestId) return false;
+      const queuedTrack = playbackQueue?.find((item) => item.id === videoId)
+        ?? this.queue.all.find((item) => item.id === videoId);
+      const track = queuedTrack
+        ? {
+            ...fetchedTrack,
+            ...queuedTrack,
+            durationSec: fetchedTrack.durationSec ?? queuedTrack.durationSec,
+            artworkUrl: queuedTrack.artworkUrl ?? fetchedTrack.artworkUrl,
+            artists: queuedTrack.artists ?? fetchedTrack.artists,
+          }
+        : fetchedTrack;
 
       this.loadedTrackId = null;
       this.setState({
@@ -673,7 +684,6 @@ export class PlayerController {
   async setVolume(level: number): Promise<void> {
     logInternalInfo("PlayerController.setVolume", { level });
     this.audioEngine.setVolume(level);
-    this.emit();
   }
 
   async skipToPrevious(): Promise<void> {

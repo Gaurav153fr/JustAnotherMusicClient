@@ -1,5 +1,12 @@
 import type { DataSource } from "../datasource/DataSource";
-import type { Album, AuthPrompt, LibrarySnapshot, Playlist, Track } from "../datasource/types";
+import type {
+  Album,
+  ArtistPage,
+  AuthPrompt,
+  LibrarySnapshot,
+  Playlist,
+  Track,
+} from "../datasource/types";
 import { logInternalError, logInternalInfo } from "../internal/logging";
 
 export type LibraryStatus = "restoring" | "signed-out" | "authorizing" | "loading" | "ready" | "error";
@@ -142,6 +149,43 @@ export class LibraryController {
     return this.dataSource.getAlbumTracks(album, onUpdate);
   }
 
+  async getArtist(
+    artistId: string,
+    onUpdate?: (artist: ArtistPage) => void,
+  ): Promise<ArtistPage> {
+    if (!this.dataSource.getArtist) {
+      throw new Error("Artist pages are unavailable.");
+    }
+    return this.dataSource.getArtist(artistId, onUpdate);
+  }
+
+  isAlbumSaved(albumId: string): boolean {
+    return this.state.library?.albums.some((album) => album.id === albumId) ?? false;
+  }
+
+  async setAlbumSaved(album: Album, saved: boolean): Promise<void> {
+    if (!this.dataSource.setAlbumSaved) {
+      throw new Error("Saving albums is unavailable.");
+    }
+    if (this.state.status === "signed-out" || !this.state.library) {
+      throw new Error("Sign in to YouTube Music to update your library.");
+    }
+
+    const previousLibrary = this.state.library;
+    const albums = saved
+      ? [album, ...previousLibrary.albums.filter((item) => item.id !== album.id)]
+      : previousLibrary.albums.filter((item) => item.id !== album.id);
+    this.setState({ library: { ...previousLibrary, albums } });
+
+    try {
+      await this.dataSource.setAlbumSaved(album, saved);
+      void this.refresh();
+    } catch (error) {
+      this.setState({ library: previousLibrary });
+      throw error;
+    }
+  }
+
   async getPlaylistTracks(playlist: Playlist, onUpdate?: (tracks: Track[]) => void): Promise<Track[]> {
     if (!this.dataSource.getPlaylistTracks) return [];
     return this.dataSource.getPlaylistTracks(playlist, onUpdate);
@@ -177,6 +221,44 @@ export class LibraryController {
       throw new Error("Sign in to YouTube Music before removing songs from playlists.");
     }
     return this.dataSource.removeTrackFromPlaylist(track, playlist);
+  }
+
+  isPlaylistSaved(playlistId: string): boolean {
+    const normalizedId = playlistId.replace(/^VL/, "");
+    return this.state.library?.playlists.some(
+      (playlist) => playlist.id.replace(/^VL/, "") === normalizedId,
+    ) ?? false;
+  }
+
+  async setPlaylistSaved(playlist: Playlist, saved: boolean): Promise<void> {
+    if (!this.dataSource.setPlaylistSaved) {
+      throw new Error("Saving playlists is unavailable.");
+    }
+    if (this.state.status === "signed-out" || !this.state.library) {
+      throw new Error("Sign in to YouTube Music to update your library.");
+    }
+
+    const previousLibrary = this.state.library;
+    const normalizedId = playlist.id.replace(/^VL/, "");
+    const playlists = saved
+      ? [
+          { ...playlist, isSaved: true, isEditable: playlist.isEditable ?? false },
+          ...previousLibrary.playlists.filter(
+            (item) => item.id.replace(/^VL/, "") !== normalizedId,
+          ),
+        ]
+      : previousLibrary.playlists.filter(
+          (item) => item.id.replace(/^VL/, "") !== normalizedId,
+        );
+    this.setState({ library: { ...previousLibrary, playlists } });
+
+    try {
+      await this.dataSource.setPlaylistSaved(playlist, saved);
+      void this.refresh();
+    } catch (error) {
+      this.setState({ library: previousLibrary });
+      throw error;
+    }
   }
 
   isTrackLiked(trackId: string): boolean {

@@ -1,13 +1,21 @@
 export type TrackSource = "youtube";
 
+export interface ArtistReference {
+  id: string;
+  name: string;
+}
+
 export interface Track {
   id: string;
   source: TrackSource;
   title: string;
   artist: string;
+  artists?: ArtistReference[];
   durationSec?: number;
   artworkUrl?: string;
   playlistItemId?: string;
+  viewCount?: number;
+  viewCountText?: string;
 }
 
 export interface LyricLine {
@@ -26,7 +34,9 @@ export interface Album {
   id: string;
   title: string;
   artist: string;
+  artists?: ArtistReference[];
   artworkUrl?: string;
+  releaseType?: "album" | "single" | "ep";
 }
 
 export interface Playlist {
@@ -35,6 +45,30 @@ export interface Playlist {
   owner: string;
   artworkUrl?: string;
   kind?: "playlist" | "liked-songs";
+  isSaved?: boolean;
+  isEditable?: boolean;
+}
+
+export interface Artist {
+  id: string;
+  name: string;
+  artworkUrl?: string;
+  subscriberCount?: string;
+}
+
+export interface ArtistPage {
+  artist: Artist;
+  popularSongs: Track[];
+  allSongs: Track[];
+  releases: Album[];
+  playlists: Playlist[];
+}
+
+export interface SearchResults {
+  artists: Artist[];
+  tracks: Track[];
+  albums: Album[];
+  playlists: Playlist[];
 }
 
 export interface AuthPrompt {

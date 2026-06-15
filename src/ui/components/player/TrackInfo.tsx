@@ -11,6 +11,7 @@ import { usePlayerUIState } from "../../stores/playerUIStore";
 import { TrackArtwork } from "../TrackArtwork";
 import { useTrackContextMenu } from "../TrackContextMenu";
 import styles from "./TrackInfo.module.css";
+import { ArtistLinks } from "../ArtistLinks";
 
 export function TrackInfo() {
   const state = usePlayerState();
@@ -78,7 +79,9 @@ export function TrackInfo() {
             {currentTrack.title}
           </span>
         </p>
-        <p className={styles.trackArtist}>{currentTrack.artist}</p>
+        <p className={styles.trackArtist}>
+          <ArtistLinks artists={currentTrack.artists} fallback={currentTrack.artist} />
+        </p>
       </div>
       <button
         type="button"

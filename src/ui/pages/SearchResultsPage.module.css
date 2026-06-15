@@ -29,9 +29,74 @@
   flex-direction: column;
 }
 
-.onboardingResults {
+.sections,
+.section {
   display: flex;
   flex-direction: column;
+  gap: 16px;
+}
+
+.sections {
+  gap: 34px;
+}
+
+.section h2 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.cardGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 18px;
+}
+
+.artistCard {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  padding: 14px;
+  border: 0;
+  border-radius: 12px;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.04);
+  text-align: left;
+}
+
+.artistCard:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.artistArtwork {
+  display: grid;
+  width: 100%;
+  aspect-ratio: 1;
+  place-items: center;
+  overflow: hidden;
+  margin-bottom: 6px;
+  border-radius: 50%;
+  background: var(--color-bg-overlay);
+}
+
+.artistArtwork img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.artistCard strong,
+.artistCard > span:last-child {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.artistCard > span:last-child {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
 }
 
 .track {

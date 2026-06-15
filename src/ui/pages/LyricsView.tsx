@@ -4,6 +4,7 @@ import type { Lyrics } from "../../datasource/types";
 import { logInternalWarn } from "../../internal/logging";
 import { playerController, usePlayerState } from "../../player/playerStore";
 import styles from "./LyricsView.module.css";
+import { ArtistLinks } from "../components/ArtistLinks";
 
 const AUTO_SCROLL_RESUME_MS = 4500;
 
@@ -114,7 +115,11 @@ export function LyricsView({ onClose }: LyricsViewProps) {
       <header className={styles.header}>
         <span className={styles.eyebrow}>Lyrics</span>
         <h1>{track?.title ?? "Nothing playing"}</h1>
-        <p>{track?.artist}</p>
+        {track && (
+          <p>
+            <ArtistLinks artists={track.artists} fallback={track.artist} />
+          </p>
+        )}
       </header>
       <button
         type="button"

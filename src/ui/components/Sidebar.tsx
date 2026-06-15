@@ -11,6 +11,7 @@ import {
   subscribeToRecentPlaylists,
 } from "../../player/recentPlaylists";
 import styles from "./Sidebar.module.css";
+import { ArtistLinks } from "./ArtistLinks";
  
 const PLAYLIST_ORDER_KEY = "ytc-sidebar-playlist-order";
 const ALBUM_ORDER_KEY = "ytc-sidebar-album-order";
@@ -640,7 +641,11 @@ export function Sidebar({
                 {!shouldHideText && (
                   <div className={styles.albumText}>
                     <span className={styles.albumTitle}>{album.title}</span>
-                    <span className={styles.albumArtist}>{album.artist}</span>
+                    <ArtistLinks
+                      className={styles.albumArtist}
+                      artists={album.artists}
+                      fallback={album.artist}
+                    />
                   </div>
                 )}
               </button>

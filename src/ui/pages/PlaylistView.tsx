@@ -8,6 +8,8 @@ import { shuffleTracks } from "../../player/shuffleTracks";
 import { useTrackContextMenu } from "../components/TrackContextMenu";
 import { useLibraryState } from "../../player/playerStore";
 import styles from "./AlbumView.module.css";
+import { ArtistLinks } from "../components/ArtistLinks";
+import { usePlaylistContextMenu } from "../components/PlaylistContextMenu";
 
 interface PlaylistViewProps {
   playlist?: Playlist;
@@ -17,6 +19,7 @@ interface PlaylistViewProps {
 
 export function PlaylistView({ playlist, playerController, libraryController }: PlaylistViewProps) {
   const { openTrackMenu } = useTrackContextMenu();
+  const { openPlaylistMenu } = usePlaylistContextMenu();
   const libraryState = useLibraryState();
   const [tracks, setTracks] = useState<Track[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -93,7 +96,10 @@ export function PlaylistView({ playlist, playerController, libraryController }: 
 
   return (
     <div className={styles.root}>
-      <header className={styles.header}>
+      <header
+        className={styles.header}
+        onContextMenu={(event) => openPlaylistMenu(event, playlist)}
+      >
         <div className={`${styles.cover} ${styles.coverFrame}`}>
           {playlist.kind === "liked-songs" || playlist.id === "LM" ? (
             <IconHeart size={80} stroke={1.6} aria-hidden="true" />
@@ -149,7 +155,11 @@ export function PlaylistView({ playlist, playerController, libraryController }: 
               <span className={styles.trackIndex}>{index + 1}</span>
               <span className={styles.trackText}>
                 <span className={styles.trackTitle}>{track.title}</span>
-                <span className={styles.trackArtist}>{track.artist}</span>
+                <ArtistLinks
+                  className={styles.trackArtist}
+                  artists={track.artists}
+                  fallback={track.artist}
+                />
               </span>
               <IconPlayerPlay size={18} />
             </button>

@@ -1,4 +1,4 @@
-import { type MouseEvent, useEffect, useState } from "react";
+import { type MouseEvent, type ReactNode, useEffect, useState } from "react";
 import { IconMusic, IconPlayerPlay } from "@tabler/icons-react";
 import styles from "./AlbumCard.module.css";
 
@@ -7,6 +7,7 @@ interface AlbumCardProps {
   artworkUrl?: string;
   title?: string;
   subtitle?: string;
+  subtitleContent?: ReactNode;
   onClick?: () => void;
   onContextMenu?: (event: MouseEvent<HTMLDivElement>) => void;
 }
@@ -16,6 +17,7 @@ export function AlbumCard({
   artworkUrl,
   title,
   subtitle,
+  subtitleContent,
   onClick,
   onContextMenu,
 }: AlbumCardProps) {
@@ -53,7 +55,9 @@ export function AlbumCard({
         </div>
       </div>
       {title && <span className={styles.title}>{title}</span>}
-      {subtitle && <span className={styles.subtitle}>{subtitle}</span>}
+      {(subtitleContent || subtitle) && (
+        <span className={styles.subtitle}>{subtitleContent ?? subtitle}</span>
+      )}
     </div>
   );
 }

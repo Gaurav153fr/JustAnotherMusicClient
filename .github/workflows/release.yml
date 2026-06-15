@@ -1,55 +1,85 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing GitHub Release tag, for example v1.2.4
+        required: true
+        type: string
 
 permissions:
   contents: write
 
 jobs:
   release:
-    name: Build ${{ matrix.platform.name }} installers
+    name: Build ${{ matrix.platform.name }}
     strategy:
       fail-fast: false
       matrix:
         platform:
           - name: Windows
             os: windows-latest
-            bundles: msi,nsis
             rust_target: ""
             build_args: --bundles msi,nsis
             apple_signing_identity: ""
           - name: macOS Apple Silicon
             os: macos-latest
-            bundles: dmg
             rust_target: aarch64-apple-darwin
             build_args: --target aarch64-apple-darwin --bundles dmg
             apple_signing_identity: "-"
           - name: macOS Intel
             os: macos-15-intel
-            bundles: dmg
             rust_target: x86_64-apple-darwin
             build_args: --target x86_64-apple-darwin --bundles dmg
             apple_signing_identity: "-"
+          - name: Linux
+            os: ubuntu-latest
+            rust_target: ""
+            build_args: --bundles deb,appimage
+            apple_signing_identity: ""
     runs-on: ${{ matrix.platform.os }}
 
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - name: Verify release exists
+        shell: bash
+        run: gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
 
       - name: Read release notification marker
         id: release_metadata
         shell: bash
         run: |
-          if git tag -l --format='%(contents)' "${{ github.ref_name }}" | grep -Fqi '[notify-update]'; then
-            echo "notify_marker=[notify-update]" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          gh release view "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --json body \
+            --jq .body > "$RUNNER_TEMP/release-body.txt"
+
+          if grep -Fqi '[notify-update]' "$RUNNER_TEMP/release-body.txt"; then
+            echo "notify_update=true" >> "$GITHUB_OUTPUT"
           else
-            echo "notify_marker=" >> "$GITHUB_OUTPUT"
+            echo "notify_update=false" >> "$GITHUB_OUTPUT"
           fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag }}
+          fetch-depth: 0
+
+      - name: Verify checked out tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git describe --tags --exact-match)" = "$RELEASE_TAG"
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -64,6 +94,25 @@ jobs:
         if: matrix.platform.rust_target != ''
         run: rustup target add ${{ matrix.platform.rust_target }}
 
+      - name: Install Linux system dependencies
+        if: matrix.platform.name == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libgtk-3-dev \
+            libsoup-3.0-dev \
+            libjavascriptcoregtk-4.1-dev \
+            patchelf
+
       - name: Cache Rust build
         uses: swatinem/rust-cache@v2
         with:
@@ -72,44 +121,31 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Build and publish release
+      - name: Build and upload installers
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APPLE_SIGNING_IDENTITY: ${{ matrix.platform.apple_signing_identity }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "Just Another Music Client ${{ github.ref_name }}"
-          releaseBody: |
-            Desktop installers for Just Another Music Client.
-
-            ${{ steps.release_metadata.outputs.notify_marker }}
-
-            Windows: download the `.msi` or NSIS setup `.exe`, or the portable `.exe` (no install needed — requires WebView2, included with Windows 10/11).
-            macOS: download the Apple Silicon `.dmg` for M-series Macs or the
-            Intel `.dmg` for older Intel Macs.
-
-            ## macOS notice
-
-            Because the macOS build is not notarized, you may need to open
-            System Settings, go to Privacy & Security, and click **Open Anyway**
-            after trying to launch the app for the first time.
-
-            macOS may also show a Keychain access popup. The app stores one
-            encryption key in its own Keychain entry. Your YouTube session is
-            encrypted with that key before it is saved in the app data directory.
-            This popup is expected.
+          tagName: ${{ inputs.release_tag }}
           releaseDraft: false
-          prerelease: false
+          uploadUpdaterJson: ${{ steps.release_metadata.outputs.notify_update }}
+          updaterJsonPreferNsis: true
           args: ${{ matrix.platform.build_args }}
 
-      - name: Upload Windows portable exe
+      - name: Upload Windows portable executable
         if: matrix.platform.name == 'Windows'
         shell: bash
         run: |
-          gh release upload ${{ github.ref_name }} "src-tauri/target/release/just-another-music-client.exe#Just-Another-Music-Client-Windows-portable.exe" --clobber
+          set -euo pipefail
+          gh release upload "$RELEASE_TAG" \
+            "src-tauri/target/release/just-another-music-client.exe#Just-Another-Music-Client-Windows-portable.exe" \
+            --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
 
       - name: Verify macOS DMG and app signature
         if: startsWith(matrix.platform.name, 'macOS')
@@ -117,12 +153,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [ -n "${{ matrix.platform.rust_target }}" ]; then
-            bundle_dir="src-tauri/target/${{ matrix.platform.rust_target }}/release/bundle/dmg"
-          else
-            bundle_dir="src-tauri/target/release/bundle/dmg"
-          fi
-
+          bundle_dir="src-tauri/target/${{ matrix.platform.rust_target }}/release/bundle/dmg"
           dmg_path="$(find "$bundle_dir" -maxdepth 1 -name '*.dmg' -print -quit)"
           test -n "$dmg_path"
           hdiutil verify "$dmg_path"
@@ -138,3 +169,78 @@ jobs:
           app_path="$(find "$mount_dir" -maxdepth 1 -name '*.app' -print -quit)"
           test -n "$app_path"
           codesign --verify --deep --strict --verbose=2 "$app_path"
+
+  publish-updater-channel:
+    name: Publish gated updater metadata
+    needs: release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag }}
+          fetch-depth: 0
+
+      - name: Read release notification marker
+        id: release_metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release view "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --json body \
+            --jq .body > "$RUNNER_TEMP/release-body.txt"
+
+          if grep -Fqi '[notify-update]' "$RUNNER_TEMP/release-body.txt"; then
+            echo "notify_update=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "notify_update=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+
+      - name: Download generated updater metadata
+        if: steps.release_metadata.outputs.notify_update == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release download "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern latest.json \
+            --dir "$RUNNER_TEMP/updater-channel"
+          test -s "$RUNNER_TEMP/updater-channel/latest.json"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+
+      - name: Publish updater channel
+        if: steps.release_metadata.outputs.notify_update == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git ls-remote --exit-code --heads origin updater-channel >/dev/null 2>&1; then
+            git fetch origin updater-channel
+            git switch --force-create updater-channel origin/updater-channel
+          else
+            git switch --orphan updater-channel
+          fi
+
+          git rm -rf --ignore-unmatch .
+          cp "$RUNNER_TEMP/updater-channel/latest.json" latest.json
+          git add latest.json
+
+          if git diff --cached --quiet; then
+            echo "Updater channel already points to $RELEASE_TAG."
+            exit 0
+          fi
+
+          git commit -m "Offer $RELEASE_TAG through the updater"
+          git push origin updater-channel
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}

@@ -13,7 +13,9 @@
     "autostart:allow-enable",
     "autostart:allow-disable",
     "autostart:allow-is-enabled",
-    "opener:default"
+    "opener:default",
+    "updater:default",
+    "process:allow-restart"
   ],
   "allowlist": {
     "shell": {
@@ -22,7 +24,7 @@
     }
   },
   "remote": {
-    "urls": ["https://**", "http://localhost/**", "http://127.0.0.1/**"]
+    "urls": ["https://**"]
   },
   "command": {
     "allow": [

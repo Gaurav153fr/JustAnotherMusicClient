@@ -1,0 +1,15 @@
+.link {
+  position: relative;
+  z-index: 1;
+  color: inherit;
+  cursor: pointer;
+  pointer-events: auto;
+  text-decoration: none;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.link:hover,
+.link:focus-visible {
+  text-decoration: underline;
+}

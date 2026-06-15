@@ -5,6 +5,7 @@ import type { LibraryController } from "../../player/LibraryController";
 import type { PlayerControllerActions } from "../../player/playerStore";
 import { shuffleTracks } from "../../player/shuffleTracks";
 import { useTrackContextMenu } from "../components/TrackContextMenu";
+import { ArtistLinks } from "../components/ArtistLinks";
 import styles from "./AlbumView.module.css";
 
 interface AlbumViewProps {
@@ -57,7 +58,9 @@ export function AlbumView({ album, playerController, libraryController }: AlbumV
         <div className={styles.headerText}>
           <span className={styles.eyebrow}>Album</span>
           <h1 className={styles.title}>{album.title}</h1>
-          <p className={styles.artist}>{album.artist}</p>
+          <p className={styles.artist}>
+            <ArtistLinks artists={album.artists} fallback={album.artist} />
+          </p>
         </div>
         <button
           className={styles.shuffleButton}
@@ -83,7 +86,11 @@ export function AlbumView({ album, playerController, libraryController }: AlbumV
               <span className={styles.trackIndex}>{index + 1}</span>
               <span className={styles.trackText}>
                 <span className={styles.trackTitle}>{track.title}</span>
-                <span className={styles.trackArtist}>{track.artist}</span>
+                <ArtistLinks
+                  className={styles.trackArtist}
+                  artists={track.artists}
+                  fallback={track.artist}
+                />
               </span>
               <IconPlayerPlay size={18} />
             </button>

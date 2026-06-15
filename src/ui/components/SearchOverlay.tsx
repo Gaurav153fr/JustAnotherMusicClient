@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { IconClock, IconSearch, IconX } from "@tabler/icons-react";
-import type { Album, Playlist, Track } from "../../datasource/types";
+import type { Album, Artist, Playlist, SearchResults, Track } from "../../datasource/types";
 import type { SearchController } from "../../player/SearchController";
 import { TrackArtwork } from "./TrackArtwork";
 import { useTrackContextMenu } from "./TrackContextMenu";
 import { isMacOS, primaryModifierLabel } from "../platform";
 import styles from "./SearchOverlay.module.css";
+import { usePlaylistContextMenu } from "./PlaylistContextMenu";
 
 const RECENT_SEARCHES_KEY = "yt-music-dock:recent-searches";
 const MAX_RECENT_SEARCHES = 5;
@@ -31,6 +32,7 @@ interface SearchOverlayProps {
   onDismiss?: () => void;
   onSubmit: (query: string, openInNewTab: boolean) => void;
   onPlayTrack: (track: Track) => void;
+  onOpenArtist: (artist: Artist) => void;
   onOpenAlbum: (album: Album) => void;
   onOpenPlaylist: (playlist: Playlist) => void;
   onQueryChange?: (query: string) => void;
@@ -46,16 +48,23 @@ export function SearchOverlay({
   onDismiss,
   onSubmit,
   onPlayTrack,
+  onOpenArtist,
   onOpenAlbum,
   onOpenPlaylist,
   onQueryChange,
 }: SearchOverlayProps) {
   const { openTrackMenu } = useTrackContextMenu();
+  const { openPlaylistMenu } = usePlaylistContextMenu();
   const inputRef = useRef<HTMLInputElement>(null);
   const requestIdRef = useRef(0);
   const modifiersRef = useRef({ primary: false, shift: false });
   const [query, setQuery] = useState("");
-  const [trackPreview, setTrackPreview] = useState<Track | null>(null);
+  const [searchResults, setSearchResults] = useState<SearchResults>({
+    artists: [],
+    tracks: [],
+    albums: [],
+    playlists: [],
+  });
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -64,7 +73,7 @@ export function SearchOverlay({
   useEffect(() => {
     if (!isOpen) return;
     setQuery("");
-    setTrackPreview(null);
+    setSearchResults({ artists: [], tracks: [], albums: [], playlists: [] });
     setSuggestions([]);
     setSelectedIndex(0);
     requestAnimationFrame(() => inputRef.current?.focus());
@@ -99,7 +108,7 @@ export function SearchOverlay({
   useEffect(() => {
     if (!isOpen || query.trim().length < 2) {
       requestIdRef.current += 1;
-      setTrackPreview(null);
+      setSearchResults({ artists: [], tracks: [], albums: [], playlists: [] });
       setSuggestions([]);
       setIsLoading(false);
       return;
@@ -108,25 +117,28 @@ export function SearchOverlay({
     const requestId = ++requestIdRef.current;
     setIsLoading(true);
     const timeoutId = window.setTimeout(() => {
-      const updatePreview = (tracks: Track[]) => {
-        if (requestId === requestIdRef.current) setTrackPreview(tracks[0] ?? null);
+      const updatePreview = (results: SearchResults) => {
+        if (requestId === requestIdRef.current) setSearchResults(results);
       };
       const updateSuggestions = (nextSuggestions: string[]) => {
         if (requestId === requestIdRef.current) setSuggestions(nextSuggestions);
       };
-      void Promise.all([
-        searchController.searchTracks(query, updatePreview),
+      void Promise.allSettled([
+        searchController.search(query, updatePreview),
         searchController.getSearchSuggestions(query, updateSuggestions),
       ])
-        .then(([tracks, nextSuggestions]) => {
+        .then(([resultsResult, suggestionsResult]) => {
           if (requestId !== requestIdRef.current) return;
-          setTrackPreview(tracks[0] ?? null);
-          setSuggestions(nextSuggestions);
-        })
-        .catch(() => {
-          if (requestId !== requestIdRef.current) return;
-          setTrackPreview(null);
-          setSuggestions([]);
+          setSearchResults(
+            resultsResult.status === "fulfilled"
+              ? resultsResult.value
+              : { artists: [], tracks: [], albums: [], playlists: [] },
+          );
+          setSuggestions(
+            suggestionsResult.status === "fulfilled"
+              ? suggestionsResult.value
+              : [],
+          );
         })
         .finally(() => {
           if (requestId === requestIdRef.current) setIsLoading(false);
@@ -159,8 +171,37 @@ export function SearchOverlay({
 
     return null;
   })();
-  const preview = libraryPreview
-    ?? (trackPreview ? { type: "track" as const, value: trackPreview } : null);
+  const remotePreview = (() => {
+    const normalizedQuery = query.trim().toLocaleLowerCase();
+    const exactArtist = searchResults.artists.find(
+      (artist) => artist.name.toLocaleLowerCase() === normalizedQuery,
+    );
+    if (exactArtist) return { type: "artist" as const, value: exactArtist };
+    const exactTrack = searchResults.tracks.find(
+      (track) => track.title.toLocaleLowerCase() === normalizedQuery,
+    );
+    if (exactTrack) return { type: "track" as const, value: exactTrack };
+    const closeArtist = searchResults.artists.find((artist) =>
+      artist.name.toLocaleLowerCase().includes(normalizedQuery)
+      || normalizedQuery.includes(artist.name.toLocaleLowerCase())
+    );
+    if (closeArtist) return { type: "artist" as const, value: closeArtist };
+    if (searchResults.tracks[0]) {
+      return { type: "track" as const, value: searchResults.tracks[0] };
+    }
+    if (searchResults.albums[0]) {
+      return { type: "album" as const, value: searchResults.albums[0] };
+    }
+    if (searchResults.playlists[0]) {
+      return { type: "playlist" as const, value: searchResults.playlists[0] };
+    }
+    return null;
+  })();
+  const normalizedPreviewQuery = query.trim().toLocaleLowerCase();
+  const preview = remotePreview?.type === "artist"
+    && remotePreview.value.name.toLocaleLowerCase() === normalizedPreviewQuery
+    ? remotePreview
+    : libraryPreview ?? remotePreview;
   const visibleRecentSearches = query ? [] : recentSearches;
   const previewOffset = preview ? 1 : 0;
   const selectableCount =
@@ -195,6 +236,7 @@ export function SearchOverlay({
     if (!preview) return;
     if (preview.type === "playlist") onOpenPlaylist(preview.value);
     if (preview.type === "album") onOpenAlbum(preview.value);
+    if (preview.type === "artist") onOpenArtist(preview.value);
     if (preview.type === "track") onPlayTrack(preview.value);
     onClose();
   };
@@ -254,7 +296,7 @@ export function SearchOverlay({
         data-onboarding="search-panel"
         role="dialog"
         aria-modal="true"
-        aria-label="Search songs, playlists, and albums"
+        aria-label="Search artists, songs, playlists, and albums"
         onMouseDown={(event) => event.stopPropagation()}
       >
         <div className={`${styles.inputRow} ${selectedIndex === 0 ? styles.selected : ""}`}>
@@ -268,8 +310,8 @@ export function SearchOverlay({
               setSelectedIndex(0);
             }}
             onKeyDown={handleKeyDown}
-            placeholder="Search songs, playlists, and albums"
-            aria-label="Search songs, playlists, and albums"
+            placeholder="Search artists, songs, playlists, and albums"
+            aria-label="Search artists, songs, playlists, and albums"
           />
           {isLoading && <span className={styles.loading}>Searching</span>}
         </div>
@@ -279,11 +321,11 @@ export function SearchOverlay({
             type="button"
             className={`${styles.result} ${selectedIndex === 1 ? styles.selected : ""}`}
             onMouseEnter={() => setSelectedIndex(1)}
-            onContextMenu={
-              preview.type === "track"
-                ? (event) => openTrackMenu(event, preview.value)
-                : undefined
-            }
+            onContextMenu={preview.type === "track"
+              ? (event) => openTrackMenu(event, preview.value)
+              : preview.type === "playlist"
+                ? (event) => openPlaylistMenu(event, preview.value)
+                : undefined}
             onClick={openPreview}
           >
             <TrackArtwork
@@ -293,12 +335,16 @@ export function SearchOverlay({
               loading="eager"
             />
             <span className={styles.trackText}>
-              <strong>{preview.value.title}</strong>
+              <strong>
+                {preview.type === "artist" ? preview.value.name : preview.value.title}
+              </strong>
               <span>
                 {preview.type === "playlist"
                   ? `Playlist - ${preview.value.owner}`
                   : preview.type === "album"
                     ? `Album - ${preview.value.artist}`
+                    : preview.type === "artist"
+                      ? preview.value.subscriberCount || "Artist"
                     : preview.value.artist}
               </span>
             </span>

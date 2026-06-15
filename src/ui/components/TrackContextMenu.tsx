@@ -33,6 +33,7 @@ import {
 } from "../../player/playerStore";
 import { TrackArtwork } from "./TrackArtwork";
 import styles from "./TrackContextMenu.module.css";
+import { ArtistLinks } from "./ArtistLinks";
 
 interface MenuPosition {
   x: number;
@@ -92,7 +93,9 @@ export function TrackContextMenuProvider({
 
   const playlists = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase();
-    const items = libraryState.library?.playlists ?? [];
+    const items = (libraryState.library?.playlists ?? []).filter(
+      (playlist) => playlist.isEditable !== false,
+    );
     if (!normalizedQuery) return items;
     return items.filter((playlist) =>
       playlist.title.toLocaleLowerCase().includes(normalizedQuery)
@@ -412,6 +415,7 @@ export function TrackContextMenuProvider({
             <span className={styles.menuLabel}>Copy link</span>
           </button>
           {menuContext?.playlist
+            && menuContext.playlist.isEditable !== false
             && menuContext.playlist.kind !== "liked-songs"
             && menuContext.playlist.id !== "LM" && (
             <button
@@ -450,7 +454,9 @@ export function TrackContextMenuProvider({
               />
               <div className={styles.trackText}>
                 <strong>{track.title}</strong>
-                <small>{track.artist}</small>
+                <small>
+                  <ArtistLinks artists={track.artists} fallback={track.artist} />
+                </small>
               </div>
               <button
                 type="button"

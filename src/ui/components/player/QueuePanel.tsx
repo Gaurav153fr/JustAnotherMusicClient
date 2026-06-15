@@ -2,6 +2,7 @@ import {  IconPlaylist, IconTrash, IconX } from "@tabler/icons-react";
 import { useEffect, useRef, useState } from "react";
 import { usePlayerSession, playerController } from "../../../player/playerStore";
 import styles from "./QueuePanel.module.css";
+import { ArtistLinks } from "../ArtistLinks";
 
 interface QueuePanelProps {
   isOpen: boolean;
@@ -244,7 +245,11 @@ export function QueuePanel({ isOpen, onClose }: QueuePanelProps) {
                       <span className={styles.trackIndex}>{index + 1}</span>
                       <span className={styles.trackDetails}>
                         <span className={styles.trackTitle}>{track.title}</span>
-                        <span className={styles.trackArtist}>{track.artist}</span>
+                        <ArtistLinks
+                          className={styles.trackArtist}
+                          artists={track.artists}
+                          fallback={track.artist}
+                        />
                       </span>
                      
                     </button>
@@ -297,7 +302,11 @@ export function QueuePanel({ isOpen, onClose }: QueuePanelProps) {
                       </span>
                       <span className={styles.trackDetails}>
                         <span className={styles.trackTitle}>{track.title}</span>
-                        <span className={styles.trackArtist}>{track.artist}</span>
+                        <ArtistLinks
+                          className={styles.trackArtist}
+                          artists={track.artists}
+                          fallback={track.artist}
+                        />
                       </span>
                       
                     </button>

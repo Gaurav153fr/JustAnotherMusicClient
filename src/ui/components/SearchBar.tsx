@@ -12,7 +12,7 @@ export function SearchBar({ onOpen, onOpenSettings }: SearchBarProps) {
     <div className={styles.row}>
       <button className={styles.bar} type="button" onClick={onOpen} data-onboarding="search">
         <IconSearch size={17} />
-        <span>Search songs, playlists, and albums</span>
+        <span>Search artists, songs, playlists, and albums</span>
         <kbd>{primaryModifierLabel} Space</kbd>
       </button>
       <button

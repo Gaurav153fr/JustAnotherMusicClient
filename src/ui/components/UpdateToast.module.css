@@ -4,6 +4,7 @@
   right: 20px;
   z-index: 320;
   min-height: 54px;
+  max-width: min(720px, calc(100vw - 40px));
   display: flex;
   align-items: center;
   gap: 14px;
@@ -19,34 +20,55 @@
   animation: toastIn 220ms var(--easing-smooth) both;
 }
 
-.toast strong {
+.message {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.message strong {
   color: var(--color-text-primary);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
   white-space: nowrap;
 }
 
-.downloadButton {
+.message span {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+}
+
+.message .error {
+  color: #ff7892;
+}
+
+.installButton,
+.changesButton {
   min-height: 36px;
   padding: 0 15px;
-  border: 1px solid #ff315a;
   border-radius: var(--radius-md);
-  background: var(--color-accent);
-  color: #fff;
   cursor: pointer;
   font: inherit;
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
-  box-shadow:
-    0 0 12px rgb(255 0 51 / 58%),
-    0 0 28px rgb(255 0 51 / 24%);
   transition:
     background var(--transition-fast),
+    border-color var(--transition-fast),
     box-shadow var(--transition-fast),
+    color var(--transition-fast),
     transform var(--transition-fast);
 }
 
-.downloadButton:hover {
+.installButton {
+  border: 1px solid #ff315a;
+  background: var(--color-accent);
+  color: #fff;
+  box-shadow:
+    0 0 12px rgb(255 0 51 / 58%),
+    0 0 28px rgb(255 0 51 / 24%);
+}
+
+.installButton:hover:not(:disabled) {
   background: #ff1746;
   box-shadow:
     0 0 16px rgb(255 0 51 / 76%),
@@ -54,8 +76,26 @@
   transform: translateY(-1px);
 }
 
-.downloadButton:active {
+.installButton:active:not(:disabled),
+.changesButton:active {
   transform: translateY(0);
+}
+
+.installButton:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.changesButton {
+  border: 1px solid rgb(255 255 255 / 14%);
+  background: rgb(255 255 255 / 6%);
+  color: var(--color-text-primary);
+}
+
+.changesButton:hover {
+  border-color: rgb(255 255 255 / 24%);
+  background: rgb(255 255 255 / 10%);
+  transform: translateY(-1px);
 }
 
 .closeButton {
@@ -83,6 +123,11 @@
 
 .closeButton:hover {
   color: #fff;
+}
+
+.closeButton:disabled {
+  cursor: default;
+  opacity: 0;
 }
 
 .closeButton:focus-visible {

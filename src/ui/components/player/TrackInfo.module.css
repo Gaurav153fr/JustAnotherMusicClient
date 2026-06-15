@@ -104,6 +104,8 @@
 }
 
 .trackDetails {
+  position: relative;
+  z-index: 2;
   display: flex;
   flex-direction: column;
   width: max-content;
@@ -152,6 +154,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   margin: 0;
+  pointer-events: auto;
 }
 
 /* Responsive: hide album art on smaller windows */

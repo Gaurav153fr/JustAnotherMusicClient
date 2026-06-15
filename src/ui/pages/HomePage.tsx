@@ -9,6 +9,7 @@ import { DiceCard } from "../components/DiceCard";
 import { TrackArtwork } from "../components/TrackArtwork";
 import { useTrackContextMenu } from "../components/TrackContextMenu";
 import styles from "./HomePage.module.css";
+import { ArtistLinks } from "../components/ArtistLinks";
 
 const FALLBACK_QUERIES = [
   "new music",
@@ -156,7 +157,7 @@ export function HomePage({
               key={track.id}
               artworkUrl={track.artworkUrl}
               title={track.title}
-              subtitle={track.artist}
+              subtitleContent={<ArtistLinks artists={track.artists} fallback={track.artist} />}
               onContextMenu={(event) => openTrackMenu(event, track)}
               onClick={() => playTrack(track, suggestions)}
             />
@@ -201,7 +202,7 @@ export function HomePage({
                 />
                 <span className={styles.compactText}>
                   <strong>{track.title}</strong>
-                  <span>{track.artist}</span>
+                  <ArtistLinks artists={track.artists} fallback={track.artist} />
                 </span>
                 <IconPlayerPlay size={18} />
               </button>
@@ -221,7 +222,7 @@ export function HomePage({
                 key={track.id}
                 artworkUrl={track.artworkUrl}
                 title={track.title}
-                subtitle={track.artist}
+                subtitleContent={<ArtistLinks artists={track.artists} fallback={track.artist} />}
                 onContextMenu={(event) => openTrackMenu(event, track)}
                 onClick={() => playTrack(track, suggestions)}
               />
@@ -239,7 +240,7 @@ export function HomePage({
                 key={track.id}
                 artworkUrl={track.artworkUrl}
                 title={track.title}
-                subtitle={track.artist}
+                subtitleContent={<ArtistLinks artists={track.artists} fallback={track.artist} />}
                 onContextMenu={(event) => openTrackMenu(event, track)}
                 onClick={() => playTrack(track, recentlyPlayed)}
               />

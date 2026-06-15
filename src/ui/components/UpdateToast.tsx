@@ -1,8 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { IconX } from "@tabler/icons-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import type { UpdateInfo } from "../../internal/updateChecker";
-import { snoozeUpdate } from "../../internal/updateChecker";
+import type { UpdateInfo, UpdateInstallProgress } from "../../internal/updateChecker";
+import { installUpdate, snoozeUpdate } from "../../internal/updateChecker";
 import styles from "./UpdateToast.module.css";
 
 const AUTO_DISMISS_MS = 60_000;
@@ -13,34 +13,68 @@ interface UpdateToastProps {
 }
 
 export function UpdateToast({ update, onDismiss }: UpdateToastProps) {
+  const [installing, setInstalling] = useState(false);
+  const [progress, setProgress] = useState<UpdateInstallProgress | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
+    if (installing) return;
     const timer = window.setTimeout(() => {
       snoozeUpdate(update.version);
       onDismiss();
     }, AUTO_DISMISS_MS);
     return () => window.clearTimeout(timer);
-  }, [onDismiss, update.version]);
+  }, [installing, onDismiss, update.version]);
 
   const dismiss = () => {
+    if (installing) return;
     snoozeUpdate(update.version);
     onDismiss();
   };
 
-  const download = () => {
-    snoozeUpdate(update.version);
-    onDismiss();
-    void openUrl(update.releaseUrl);
+  const install = async () => {
+    setInstalling(true);
+    setError(null);
+    try {
+      await installUpdate(update, setProgress);
+    } catch {
+      setError("Installation failed. You can still download it from GitHub.");
+      setInstalling(false);
+    }
   };
 
   return (
     <div className={styles.toast} role="status" aria-live="polite">
-      <strong>New version available</strong>
-      <button className={styles.downloadButton} type="button" onClick={download}>
-        Download
+      <div className={styles.message}>
+        <strong>Version {update.version} is available</strong>
+        {installing && (
+          <span>
+            {progress?.percent !== undefined
+              ? `Downloading ${progress.percent}%`
+              : "Preparing update..."}
+          </span>
+        )}
+        {error && <span className={styles.error}>{error}</span>}
+      </div>
+      <button
+        className={styles.installButton}
+        type="button"
+        disabled={installing}
+        onClick={() => void install()}
+      >
+        {installing ? "Installing..." : "Install"}
+      </button>
+      <button
+        className={styles.changesButton}
+        type="button"
+        onClick={() => void openUrl(update.releaseUrl)}
+      >
+        View changes
       </button>
       <button
         className={styles.closeButton}
         type="button"
+        disabled={installing}
         onClick={dismiss}
         aria-label="Close update notification"
         title="Close"

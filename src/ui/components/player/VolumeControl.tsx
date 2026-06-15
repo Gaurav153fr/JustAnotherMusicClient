@@ -13,16 +13,24 @@ export function VolumeControl() {
   );
   const displayedVolumeRef = useRef(displayedVolume);
   const volumeAnimationRef = useRef<number | null>(null);
+  const pointerStartRef = useRef({ x: 0, y: 0 });
+  const isPointerDownRef = useRef(false);
+  const isDraggingRef = useRef(false);
 
   const setVolumeDisplay = (value: number) => {
     displayedVolumeRef.current = value;
     setDisplayedVolume(value);
   };
 
-  const animateVolumeTo = (target: number) => {
+  const cancelVolumeAnimation = () => {
     if (volumeAnimationRef.current !== null) {
       cancelAnimationFrame(volumeAnimationRef.current);
+      volumeAnimationRef.current = null;
     }
+  };
+
+  const animateVolumeTo = (target: number) => {
+    cancelVolumeAnimation();
 
     const start = displayedVolumeRef.current;
     const startedAt = performance.now();
@@ -50,9 +58,7 @@ export function VolumeControl() {
   }, [playerState]);
 
   useEffect(() => () => {
-    if (volumeAnimationRef.current !== null) {
-      cancelAnimationFrame(volumeAnimationRef.current);
-    }
+    cancelVolumeAnimation();
   }, []);
 
   useEffect(() => {
@@ -69,12 +75,15 @@ export function VolumeControl() {
     return () => slider.removeEventListener("wheel", preventBackgroundScroll);
   }, []);
 
-  const updateVolume = (value: number) => {
+  const updateVolume = (value: number, updateDisplay = true) => {
     const clampedValue = Math.min(1, Math.max(0, value));
     const roundedValue = Math.round(clampedValue * 100) / 100;
 
     setVolume(roundedValue);
-    setVolumeDisplay(roundedValue);
+    if (updateDisplay) {
+      cancelVolumeAnimation();
+      setVolumeDisplay(roundedValue);
+    }
     const shouldBeMuted = roundedValue === 0;
     if (isMuted !== shouldBeMuted) {
       setIsMuted(shouldBeMuted);
@@ -85,7 +94,37 @@ export function VolumeControl() {
 
   const handleVolumeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseFloat(event.target.value);
-    updateVolume(value);
+    const shouldAnimate = isPointerDownRef.current && !isDraggingRef.current;
+    updateVolume(value, !shouldAnimate);
+    if (shouldAnimate) {
+      animateVolumeTo(value);
+    }
+  };
+
+  const handleVolumePointerDown = (event: React.PointerEvent<HTMLInputElement>) => {
+    event.currentTarget.setPointerCapture(event.pointerId);
+    pointerStartRef.current = { x: event.clientX, y: event.clientY };
+    isPointerDownRef.current = true;
+    isDraggingRef.current = false;
+  };
+
+  const handleVolumePointerMove = (event: React.PointerEvent<HTMLInputElement>) => {
+    if (!isPointerDownRef.current || isDraggingRef.current) return;
+
+    const distance = Math.hypot(
+      event.clientX - pointerStartRef.current.x,
+      event.clientY - pointerStartRef.current.y,
+    );
+    if (distance < 3) return;
+
+    isDraggingRef.current = true;
+    cancelVolumeAnimation();
+    setVolumeDisplay(Number(event.currentTarget.value));
+  };
+
+  const handleVolumePointerEnd = () => {
+    isPointerDownRef.current = false;
+    isDraggingRef.current = false;
   };
 
   const handleVolumeWheel = (event: React.WheelEvent<HTMLInputElement>) => {
@@ -126,6 +165,10 @@ export function VolumeControl() {
         step="0.01"
         value={displayedVolume}
         onChange={handleVolumeChange}
+        onPointerDown={handleVolumePointerDown}
+        onPointerMove={handleVolumePointerMove}
+        onPointerUp={handleVolumePointerEnd}
+        onPointerCancel={handleVolumePointerEnd}
         onWheel={handleVolumeWheel}
         className={styles.volumeSlider}
         style={{

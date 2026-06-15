@@ -15,7 +15,9 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   checkForUpdates,
   getInstalledVersion,
+  installUpdate,
   type UpdateInfo,
+  type UpdateInstallProgress,
 } from "../../internal/updateChecker";
 import {
   clearCache,
@@ -55,8 +57,10 @@ export function SettingsPage({
   const [installedVersion, setInstalledVersion] = useState<string | null>(null);
   const [updateResult, setUpdateResult] = useState<UpdateInfo | null>(null);
   const [updateStatus, setUpdateStatus] = useState<
-    "idle" | "checking" | "current" | "error"
+    "idle" | "checking" | "installing" | "current" | "error"
   >("idle");
+  const [updateProgress, setUpdateProgress] = useState<UpdateInstallProgress | null>(null);
+  const [updateError, setUpdateError] = useState<string | null>(null);
   const [autostartEnabled, setAutostartEnabledState] = useState(false);
   const [autostartLoading, setAutostartLoading] = useState(true);
   const [autostartError, setAutostartError] = useState<string | null>(null);
@@ -100,11 +104,26 @@ export function SettingsPage({
   const handleCheckForUpdates = async () => {
     setUpdateStatus("checking");
     setUpdateResult(null);
+    setUpdateError(null);
+    setUpdateProgress(null);
     try {
       const update = await checkForUpdates();
       setUpdateResult(update);
       setUpdateStatus(update ? "idle" : "current");
     } catch {
+      setUpdateError("Unable to check for updates.");
+      setUpdateStatus("error");
+    }
+  };
+
+  const handleInstallUpdate = async () => {
+    if (!updateResult) return;
+    setUpdateStatus("installing");
+    setUpdateError(null);
+    try {
+      await installUpdate(updateResult, setUpdateProgress);
+    } catch {
+      setUpdateError("Unable to install the update. You can download it from GitHub.");
       setUpdateStatus("error");
     }
   };
@@ -388,13 +407,27 @@ export function SettingsPage({
         </div>
         {updateResult && (
           <div className={styles.updateResult}>
-            <span>Version {updateResult.version} is available.</span>
+            <span>
+              {updateStatus === "installing"
+                ? updateProgress?.percent !== undefined
+                  ? `Downloading version ${updateResult.version}: ${updateProgress.percent}%`
+                  : `Preparing version ${updateResult.version}...`
+                : `Version ${updateResult.version} is available.`}
+            </span>
             <button
               className={styles.githubButton}
               type="button"
+              disabled={updateStatus === "installing"}
+              onClick={() => void handleInstallUpdate()}
+            >
+              {updateStatus === "installing" ? "Installing..." : "Install"}
+            </button>
+            <button
+              className={styles.secondaryButton}
+              type="button"
               onClick={() => void openUrl(updateResult.releaseUrl)}
             >
-              Download
+              View changes
             </button>
           </div>
         )}
@@ -402,7 +435,7 @@ export function SettingsPage({
           <p className={styles.updateMessage}>You are up to date.</p>
         )}
         {updateStatus === "error" && (
-          <p className={styles.error}>Unable to check for updates.</p>
+          <p className={styles.error}>{updateError}</p>
         )}
       </section>
 

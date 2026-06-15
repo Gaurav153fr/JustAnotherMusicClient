@@ -1,4 +1,13 @@
-import type { Album, AuthPrompt, LibrarySnapshot, Lyrics, Playlist, Track } from "./types";
+import type {
+  Album,
+  ArtistPage,
+  AuthPrompt,
+  LibrarySnapshot,
+  Lyrics,
+  Playlist,
+  SearchResults,
+  Track,
+} from "./types";
 
 export type StreamData = {
   bytes: ArrayBuffer;
@@ -8,6 +17,7 @@ export type StreamData = {
 export abstract class DataSource {
   abstract getTrack(id: string): Promise<Track>;
   abstract getStreamUrl(track: Track): Promise<string>;
+  search?(query: string, onUpdate?: (results: SearchResults) => void): Promise<SearchResults>;
   searchTracks?(query: string, onUpdate?: (tracks: Track[]) => void): Promise<Track[]>;
   getSearchSuggestions?(query: string, onUpdate?: (suggestions: string[]) => void): Promise<string[]>;
   getStreamData?(track: Track): Promise<StreamData>;
@@ -17,7 +27,10 @@ export abstract class DataSource {
   getCachedLibrary?(): Promise<LibrarySnapshot | null>;
   getLibrary?(onUpdate?: (library: LibrarySnapshot) => void): Promise<LibrarySnapshot>;
   getAlbumTracks?(album: Album, onUpdate?: (tracks: Track[]) => void): Promise<Track[]>;
+  setAlbumSaved?(album: Album, saved: boolean): Promise<void>;
+  getArtist?(artistId: string, onUpdate?: (artist: ArtistPage) => void): Promise<ArtistPage>;
   getPlaylistTracks?(playlist: Playlist, onUpdate?: (tracks: Track[]) => void): Promise<Track[]>;
+  setPlaylistSaved?(playlist: Playlist, saved: boolean): Promise<void>;
   addTrackToPlaylist?(
     track: Track,
     playlist: Playlist,

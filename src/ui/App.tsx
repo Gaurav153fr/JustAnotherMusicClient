@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Album, Playlist, Track } from "../datasource/types";
+import type { Album, Artist, Playlist, SearchResults, Track } from "../datasource/types";
 import { useDisableContextMenu } from "./hooks/useDisableContextMenu";
 import { HomePage } from "./pages/HomePage";
 import { AlbumView } from "./pages/AlbumView";
@@ -7,8 +7,11 @@ import { PlaylistView } from "./pages/PlaylistView";
 import { SearchResultsPage } from "./pages/SearchResultsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { LyricsView } from "./pages/LyricsView";
+import { ArtistView } from "./pages/ArtistView";
 import { SearchOverlay } from "./components/SearchOverlay";
 import { TrackContextMenuProvider } from "./components/TrackContextMenu";
+import { PlaylistContextMenuProvider } from "./components/PlaylistContextMenu";
+import { ArtistNavigationProvider } from "./components/ArtistLinks";
 import { TitleBar } from "./components/TitleBar";
 import { PlayerBar } from "./components/player/PlayerBar";
 import { QueuePanel } from "./components/player/QueuePanel";
@@ -112,6 +115,7 @@ export default function App() {
     activeTabId,
     activeTab?.view,
     activeTab?.album?.id,
+    activeTab?.artist?.id,
     activeTab?.playlist?.id,
     activeTab?.searchQuery,
   ].filter(Boolean).join(":");
@@ -121,7 +125,13 @@ export default function App() {
     setTabs((prevTabs) =>
       prevTabs.map((tab) =>
         tab.id === activeTabId
-          ? { ...tab, view: "home", album: undefined, playlist: undefined }
+          ? {
+              ...tab,
+              view: "home",
+              album: undefined,
+              artist: undefined,
+              playlist: undefined,
+            }
           : tab
       )
     );
@@ -216,7 +226,55 @@ export default function App() {
     setTabs((prevTabs) =>
       prevTabs.map((tab) =>
         tab.id === activeTabId
-          ? { ...tab, view: "album", album, playlist: undefined }
+          ? {
+              ...tab,
+              view: "album",
+              album,
+              artist: undefined,
+              playlist: undefined,
+            }
+          : tab
+      )
+    );
+  };
+
+  const handleNavigateArtist = (artist: Artist, openInNewTab = false) => {
+    playerUIStore.setLyricsOpen(false);
+    if (!artist.id) {
+      void searchController.search(artist.name)
+        .then((results) => {
+          const normalizedName = artist.name.toLocaleLowerCase();
+          const resolved = results.artists.find(
+            (candidate) => candidate.name.toLocaleLowerCase() === normalizedName,
+          ) ?? results.artists[0];
+          if (resolved) handleNavigateArtist(resolved, openInNewTab);
+        });
+      return;
+    }
+    if (openInNewTab) {
+      const newId = nextTabId.toString();
+      tabManager.createTab(newId);
+      void tabManager.setActive(newId);
+      setTabs((prevTabs) => [
+        ...prevTabs,
+        { id: newId, view: "artist", artist, title: artist.name },
+      ]);
+      setActiveTabId(newId);
+      setNextTabId((currentId) => currentId + 1);
+      return;
+    }
+
+    setTabs((prevTabs) =>
+      prevTabs.map((tab) =>
+        tab.id === activeTabId
+          ? {
+              ...tab,
+              view: "artist",
+              artist,
+              title: artist.name,
+              album: undefined,
+              playlist: undefined,
+            }
           : tab
       )
     );
@@ -231,7 +289,13 @@ export default function App() {
     setTabs((prevTabs) =>
       prevTabs.map((tab) =>
         tab.id === activeTabId
-          ? { ...tab, view: "playlist", playlist, album: undefined }
+          ? {
+              ...tab,
+              view: "playlist",
+              playlist,
+              album: undefined,
+              artist: undefined,
+            }
           : tab
       )
     );
@@ -295,6 +359,7 @@ export default function App() {
           title: query,
           searchQuery: query,
           searchResults: [],
+          mixedSearchResults: { artists: [], tracks: [], albums: [], playlists: [] },
           searchLoading: true,
         },
       ]);
@@ -309,9 +374,11 @@ export default function App() {
                 view: "search",
                 title: query,
                 album: undefined,
+                artist: undefined,
                 playlist: undefined,
                 searchQuery: query,
                 searchResults: [],
+                mixedSearchResults: { artists: [], tracks: [], albums: [], playlists: [] },
                 searchLoading: true,
               }
             : tab
@@ -322,7 +389,7 @@ export default function App() {
     const searchTabId = targetTabId;
     if (onboardingStep === "type-first") setOnboardingStep("play-first");
     if (onboardingStep === "type-second") setOnboardingStep("play-second");
-    const applySearchResults = (tracks: Track[]) => {
+    const applySearchResults = (results: SearchResults) => {
       setTabs((prevTabs) =>
         prevTabs.map((tab) =>
           tab.id === searchTabId && tab.searchQuery === query
@@ -331,9 +398,11 @@ export default function App() {
                 view: "search",
                 title: query,
                 album: undefined,
+                artist: undefined,
                 playlist: undefined,
                 searchQuery: query,
-                searchResults: tracks,
+                searchResults: results.tracks,
+                mixedSearchResults: results,
                 searchLoading: false,
               }
             : tab
@@ -341,7 +410,7 @@ export default function App() {
       );
     };
 
-    void searchController.searchTracks(query, applySearchResults)
+    void searchController.search(query, applySearchResults)
       .then(applySearchResults)
       .catch(() => {
         setTabs((prevTabs) =>
@@ -352,9 +421,11 @@ export default function App() {
                   view: "search",
                   title: query,
                   album: undefined,
+                  artist: undefined,
                   playlist: undefined,
                   searchQuery: query,
                   searchResults: [],
+                  mixedSearchResults: { artists: [], tracks: [], albums: [], playlists: [] },
                   searchLoading: false,
                 }
               : tab
@@ -697,7 +768,9 @@ export default function App() {
   ]);
 
   return (
+    <ArtistNavigationProvider onNavigate={handleNavigateArtist}>
     <TrackContextMenuProvider libraryController={libraryController}>
+    <PlaylistContextMenuProvider libraryController={libraryController}>
     <div className={styles.root}>
       <TitleBar
         tabs={tabs}
@@ -756,6 +829,15 @@ export default function App() {
                 libraryController={libraryController}
               />
             )}
+            {activeTab?.view === "artist" && (
+              <ArtistView
+                artist={activeTab.artist}
+                playerController={playerController}
+                libraryController={libraryController}
+                onOpenAlbum={handleNavigateAlbum}
+                onOpenPlaylist={handleNavigatePlaylist}
+              />
+            )}
             {activeTab?.view === "playlist" && (
               <PlaylistView
                 playlist={activeTab.playlist}
@@ -766,10 +848,18 @@ export default function App() {
             {activeTab?.view === "search" && (
                 <SearchResultsPage
                 query={activeTab.searchQuery ?? ""}
-                tracks={activeTab.searchResults ?? []}
+                results={activeTab.mixedSearchResults ?? {
+                  artists: [],
+                  tracks: activeTab.searchResults ?? [],
+                  albums: [],
+                  playlists: [],
+                }}
                 isLoading={activeTab.searchLoading ?? false}
                   playerController={playerController}
                     onPlayTrack={handlePlaySearchResult}
+                onOpenArtist={(artist) => handleNavigateArtist(artist)}
+                onOpenAlbum={handleNavigateAlbum}
+                onOpenPlaylist={handleNavigatePlaylist}
                 />
             )}
             {activeTab?.view === "settings" && (
@@ -801,6 +891,7 @@ export default function App() {
         onSubmit={handleSearch}
         onPlayTrack={(track) => void handlePlaySearchTrack(track)}
         onOpenAlbum={handleNavigateAlbum}
+        onOpenArtist={(artist) => handleNavigateArtist(artist)}
         onOpenPlaylist={handleNavigatePlaylist}
         onQueryChange={setOnboardingSearchQuery}
       />
@@ -827,6 +918,8 @@ export default function App() {
         />
       )}
     </div>
+    </PlaylistContextMenuProvider>
     </TrackContextMenuProvider>
+    </ArtistNavigationProvider>
   );
 }
