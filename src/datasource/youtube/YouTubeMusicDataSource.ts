@@ -691,7 +691,7 @@ export class YouTubeMusicDataSource extends DataSource {
     };
 
     visit(root);
-    const result: RawToggleButtonRenderer | null = match ?? fallback;
+    const result = (match ?? fallback) as RawToggleButtonRenderer | null;
     if (result) {
       logInternalInfo("YouTubeMusicDataSource.findRawLibraryToggle found toggle", {
         source: match ? "tooltip" : "fallback",
