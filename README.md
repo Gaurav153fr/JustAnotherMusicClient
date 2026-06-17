@@ -6,7 +6,7 @@
   </picture>
 </p>
 
-A desktop YouTube Music client built with Tauri, React, and TypeScript for **Windows & (experimental) MacOs**.
+A desktop YouTube Music client built with Tauri, React, and TypeScript for **Windows, MacOs & Linux**.
 <p></p>
 
 > **IMPORTANT**
@@ -54,7 +54,7 @@ JustAnotherMusicClient brings YouTube Music to the desktop in a focused, native-
 | Song Management | Add songs to playlists or queue, view your queue, quickly via Ctrl+S or right-click |
 ## Download ⏬
 
-Download the **newest available installer** from the [latest release](https://github.com/2latemc/JustAnotherMusicClient/releases/latest) for either Windows or MacOs.
+Download the **newest available installer** from the [latest release](https://github.com/2latemc/JustAnotherMusicClient/releases/latest) for either Windows, MacOs or Linux.
 <a href="https://github.com/2latemc/JustAnotherMusicClient/releases/latest">
   <picture>
     <source
@@ -71,26 +71,28 @@ Download the **newest available installer** from the [latest release](https://gi
 </a>
 
 ## Roadmap 📌
-- ~~Full Linux and MacOS support~~
+
 - Last.fm integration
 - **Better lyrics consistency** (some songs still don't have them)
-- **Artist Pages** with monthly listeners, playlists and popular songs alongside streams amount feature when clicking on the artist name, also integrate into the search results so that one can find artists
-- ~~Liked songs playlist support~~
-- ~~Discord RCP is coming~~
-- **App Auto-Update** so that you don't manually have to check for changes
-- Maximize Button + An option for Windows-style window controls
-- ~~Start App on boot option~~
 - Raycast support with app specific URLs
 - Fix Windows media player controls sometimes not working
 - **Music Video** support
-- Space to pause sometimes selects elements instead of pausing / resuming
+- ~~App Auto-Update so that you don't manually have to check for changes~~
+- ~~Maximize Button + An option for Windows-style window controls~~
+- ~~Start App on boot option~~
+- ~~Liked songs playlist support~~
+- ~~Discord RCP is coming~~
+- ~~Full Linux and MacOS support~~
+- ~~Space to pause sometimes selects elements instead of pausing / resuming~~
 - ~~Cap Too long Song names and make them smoothly move vertically~~
+- ~~Artist Pages with monthly listeners, playlists and popular songs alongside streams amount feature when clicking on the artist name, also integrate into the search results so that one can find artists~~
 
 ## Platform Support 💻
 
 - **Windows** is the primary supported platform.
-- **macOS** does not work at this point but will soon
-- **Linux** support is in the working. This should take a few days until it's implemented! 
+- **macOS** supported. Sometimes some experimental releases don't work at first, so try some older ones if that is the case.
+- **Linux** supported. Sometimes some experimental releases don't work at first, so try some older ones if that is the case
+
 ### MacOs Issues
 **MacOs may prompt you with a Keychain popup asking for permission.** The app stores one encryption key in its own Keychain entry. Your YouTube Music session is encrypted with that key before it is saved in the app data directory.
 
