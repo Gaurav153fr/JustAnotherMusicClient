@@ -1739,15 +1739,21 @@ pub fn run() {
 tauri::WindowEvent::Focused(false) => {
     if window.label() == "main" {
         let app = window.app_handle().clone();
-        // small delay to let the other window gain focus first
-        std::thread::spawn(move || {
-            std::thread::sleep(std::time::Duration::from_millis(100));
-           
-            if let Some(mini) = app.get_webview_window("mini-player") {
-                if let Ok(true) = mini.is_focused() {
-                    return; 
+        thread::spawn(move || {
+            thread::sleep(Duration::from_millis(100));
+
+            if let Some(main) = app.get_webview_window("main") {
+                if let Ok(true) = main.is_focused() {
+                    return;
                 }
             }
+
+            if let Some(mini) = app.get_webview_window("mini-player") {
+                if let Ok(true) = mini.is_focused() {
+                    return;
+                }
+            }
+
             let _ = app.emit("window-minimized", ());
         });
     }

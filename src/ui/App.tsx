@@ -48,6 +48,9 @@ import { isMacOS } from "./platform";
 
 import { emit, listen } from "@tauri-apps/api/event";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { currentMonitor } from "@tauri-apps/api/window";
+import { PhysicalPosition } from "@tauri-apps/api/dpi";
+import { getSavedMiniPlayerPosition, useMiniPlayerEnabled } from "./settings/miniPlayer";
 const restoredSession = loadAppSession();
 const LOADING_SCREEN_FADE_MS = 80;
 const ONBOARDING_COMPLETE_KEY = "yt-music-dock:onboarding-complete";
@@ -55,6 +58,7 @@ const KEYCHAIN_NOTICE_COMPLETE_KEY = "yt-music-dock:keychain-notice-complete";
 const LOADING_SCREEN_MIN_MS = 1000;
 const MOUSE_BACK_BUTTON = 3;
 const MOUSE_FORWARD_BUTTON = 4;
+const MINI_PLAYER_BOTTOM_MARGIN = 24;
 
 function getNavigationState(tab: Tab): TabViewState | null {
   if (tab.view === "settings") return null;
@@ -108,11 +112,29 @@ function stripNavigationHistory(tab: Tab): Tab {
   return sessionTab;
 }
 
+async function placeMiniPlayerAtBottomCenter(miniWin: WebviewWindow) {
+  const savedPosition = getSavedMiniPlayerPosition();
+  if (savedPosition) {
+    await miniWin.setPosition(new PhysicalPosition(savedPosition.x, savedPosition.y));
+    return;
+  }
+
+  const monitor = await currentMonitor();
+  if (!monitor) return;
+
+  const size = await miniWin.outerSize();
+  const x = monitor.position.x + Math.round((monitor.size.width - size.width) / 2);
+  const y = monitor.position.y + monitor.size.height - size.height - MINI_PLAYER_BOTTOM_MARGIN;
+
+  await miniWin.setPosition(new PhysicalPosition(x, y));
+}
+
 export default function App() {
   useDisableContextMenu();
   const libraryState = useLibraryState();
   const playerState = usePlayerState();
   const playerUIState = usePlayerUIState();
+  const miniPlayerEnabled = useMiniPlayerEnabled();
 
   const [tabs, setTabs] = useState<Tab[]>(
     () => restoredSession?.tabs.map(stripNavigationHistory) ?? [{ id: "1", view: "home" }],
@@ -148,6 +170,8 @@ export default function App() {
   }, []);
   const loadingScreenDismissedRef = useRef(false);
   const loadingScreenStartedAtRef = useRef(performance.now());
+  const miniPlayerPositionedRef = useRef(false);
+  const miniPlayerRestoreSuppressUntilRef = useRef(0);
   const sessionStateRef = useRef({ tabs, activeTabId, nextTabId });
   sessionStateRef.current = { tabs, activeTabId, nextTabId };
 
@@ -949,27 +973,56 @@ export default function App() {
 
 useEffect(() => {
   const setupListeners = async () => {
-const unlistenMinimize = await listen("window-minimized", async () => {
-  const miniWin = await WebviewWindow.getByLabel("mini-player");
-  if (miniWin) {
-    await miniWin.show();
-    await miniWin.setFocus();
-  }
-});
+    const hideMiniPlayer = async () => {
+      const miniWin = await WebviewWindow.getByLabel("mini-player");
+      if (miniWin) await miniWin.hide();
+    };
 
-const unlistenFocus = await listen("window-focused", async () => {
-  const miniWin = await WebviewWindow.getByLabel("mini-player");
-  if (miniWin) await miniWin.hide();
-});
+    const unlistenMinimize = await listen("window-minimized", async () => {
+      const miniWin = await WebviewWindow.getByLabel("mini-player");
+      if (!miniWin) return;
+
+      if (Date.now() < miniPlayerRestoreSuppressUntilRef.current) {
+        await miniWin.hide();
+        return;
+      }
+
+      if (!miniPlayerEnabled) {
+        await miniWin.hide();
+        return;
+      }
+
+      if (!miniPlayerPositionedRef.current) {
+        try {
+          await placeMiniPlayerAtBottomCenter(miniWin);
+        } catch (_) {}
+        miniPlayerPositionedRef.current = true;
+      }
+
+      await miniWin.show();
+      await miniWin.setFocus();
+    });
+
+    const unlistenFocus = await listen("window-focused", hideMiniPlayer);
+    const unlistenRestoreMain = await listen("mini-player:restore-main", async () => {
+      miniPlayerRestoreSuppressUntilRef.current = Date.now() + 800;
+      await hideMiniPlayer();
+    });
+
+    if (!miniPlayerEnabled) {
+      await hideMiniPlayer();
+    }
+
     return () => {
       unlistenMinimize();
       unlistenFocus();
+      unlistenRestoreMain();
     };
   };
 
   const cleanup = setupListeners();
   return () => { cleanup.then(fn => fn?.()); };
-}, []);
+}, [miniPlayerEnabled]);
 
 
 useEffect(() => {
@@ -997,24 +1050,29 @@ useEffect(() => {
 useEffect(() => {
   let lastTrackId: string | null = null;
   let lastStatus: string | null = null;
+  let lastArtworkUrl: string | null = null;
 
-  // sync track/status changes
-  const unsubscribe = tabManager.subscribe(() => {
+  const syncPlayerState = () => {
     const state = tabManager.getActiveState();
     const trackId = state.currentTrack?.id ?? null;
     const status = state.status;
+    const artworkUrl = state.currentTrack?.artworkUrl ?? null;
 
-    if (trackId === lastTrackId && status === lastStatus) return;
+    if (trackId === lastTrackId && status === lastStatus && artworkUrl === lastArtworkUrl) return;
     lastTrackId = trackId;
     lastStatus = status;
+    lastArtworkUrl = artworkUrl;
 
     void emit("player-state-sync", {
       status,
-      artworkUrl: state.currentTrack?.artworkUrl ?? null,
+      artworkUrl,
       title: state.currentTrack?.title ?? null,
       artist: state.currentTrack?.artist ?? null,
     });
-  });
+  };
+
+  syncPlayerState();
+  const unsubscribe = tabManager.subscribe(syncPlayerState);
 
   // sync time separately via rAF — don't put this in tabManager.subscribe
   let running = true;

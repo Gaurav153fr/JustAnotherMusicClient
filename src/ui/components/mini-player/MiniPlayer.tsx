@@ -1,7 +1,17 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type MouseEvent } from "react";
 import { emit, listen } from "@tauri-apps/api/event";
-import { cursorPosition, getCurrentWindow, PhysicalPosition, primaryMonitor } from "@tauri-apps/api/window";
+import { cursorPosition, getCurrentWindow, PhysicalPosition } from "@tauri-apps/api/window";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
+import {
+  IconLoader2,
+  IconPlayerPause,
+  IconPlayerPlay,
+  IconPlayerSkipBack,
+  IconPlayerSkipForward,
+  IconX,
+} from "@tabler/icons-react";
+import { saveMiniPlayerPosition } from "../../settings/miniPlayer";
+import { TrackArtwork } from "../TrackArtwork";
 import styles from "./MiniPlayer.module.css";
 
 interface PlayerSync {
@@ -10,12 +20,18 @@ interface PlayerSync {
   title: string | null;
   artist: string | null;
 }
-  interface TimeSync {
+
+interface TimeSync {
   currentTime: number;
   duration: number;
 }
 
 const win = getCurrentWindow();
+const PILL_WIDTH = 160;
+const BOTTOM_PILL_HEIGHT = 60;
+const TOP_PILL_HEIGHT = 44;
+const GAP = 6;
+const RIGHT_MOUSE_BUTTON = 2;
 
 export default function MiniPlayer() {
   const [playerState, setPlayerState] = useState<PlayerSync>({
@@ -25,78 +41,60 @@ export default function MiniPlayer() {
     artist: null,
   });
   const [expanded, setExpanded] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const [timeState, setTimeState] = useState<TimeSync>({ currentTime: 0, duration: 0 });
-const [cachedArtwork, setCachedArtwork] = useState<string | null>(null);
+  const [cachedArtwork, setCachedArtwork] = useState<string | null>(null);
+  const expandedRef = useRef(false);
+  const dragTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-const expandedRef = useRef(false);
+  const setExpandedBoth = (value: boolean) => {
+    expandedRef.current = value;
+    setExpanded(value);
+  };
 
-const setExpandedBoth = (val: boolean) => {
-  expandedRef.current = val;
-  setExpanded(val);
-};
   useEffect(() => {
     const setup = async () => {
       const unlisten = await listen<PlayerSync>("player-state-sync", (event) => {
-       setPlayerState(prev => {
-        // only update artwork if it actually changed
-        if (event.payload.artworkUrl !== prev.artworkUrl) {
-          setCachedArtwork(event.payload.artworkUrl);
-        }
-        return event.payload;
+        setPlayerState((previous) => {
+          if (event.payload.artworkUrl && event.payload.artworkUrl !== previous.artworkUrl) {
+            setCachedArtwork(event.payload.artworkUrl);
+          }
+
+          return event.payload;
+        });
       });
-      });
+
       return unlisten;
     };
+
     const cleanup = setup();
-    return () => { cleanup.then(fn => fn()); };
+    return () => { cleanup.then((unlisten) => unlisten()); };
   }, []);
 
   useEffect(() => {
-    let unlisten: () => void;
-    let debounceTimer: ReturnType<typeof setTimeout>;
-
-    const setup = async () => {
-      const monitor = await primaryMonitor();
-      if (!monitor) return;
-
-      const screenPos = monitor.position;
-      const screenSize = monitor.size;
-
-      unlisten = await win.listen("tauri://move", async () => {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(async () => {
-          const position = await win.outerPosition();
-          const size = await win.outerSize();
-
-          const minX = screenPos.x;
-          const minY = screenPos.y;
-          const maxX = screenPos.x + screenSize.width - size.width;
-          const maxY = screenPos.y + screenSize.height - size.height;
-
-          const clampedX = Math.min(Math.max(position.x, minX), maxX);
-          const clampedY = Math.min(Math.max(position.y, minY), maxY);
-
-          if (clampedX !== position.x || clampedY !== position.y) {
-            await win.setPosition(new PhysicalPosition(clampedX, clampedY));
-          }
-        }, 100);
-      });
-    };
-
-    setup();
     return () => {
-      if (unlisten) unlisten();
-      clearTimeout(debounceTimer);
+      if (dragTimerRef.current) {
+        clearInterval(dragTimerRef.current);
+      }
+      setIsDragging(false);
     };
   }, []);
 
-useEffect(() => {
-    win.setIgnoreCursorEvents(true);
+  useEffect(() => {
+    const setup = async () => {
+      const unlisten = await listen<TimeSync>("player-time-sync", (event) => {
+        setTimeState(event.payload);
+      });
 
-    const PILL_WIDTH = 200;
-    const BOTTOM_PILL_HEIGHT = 60;
-    const TOP_PILL_HEIGHT = 44;
-    const GAP = 6;
+      return unlisten;
+    };
+
+    const cleanup = setup();
+    return () => { cleanup.then((unlisten) => unlisten()); };
+  }, []);
+
+  useEffect(() => {
+    void win.setIgnoreCursorEvents(true);
 
     let isOver = false;
     let running = true;
@@ -104,26 +102,23 @@ useEffect(() => {
 
     const poll = async () => {
       if (!running) return;
+
       try {
         const cursor = await cursorPosition();
         const position = await win.outerPosition();
         const size = await win.outerSize();
-
-        // compute inside poll so it always uses latest expandedRef value
-        const TOTAL_HEIGHT = expandedRef.current
+        const totalHeight = expandedRef.current
           ? BOTTOM_PILL_HEIGHT + GAP + TOP_PILL_HEIGHT
           : BOTTOM_PILL_HEIGHT;
 
         const pillLeft = position.x + (size.width - PILL_WIDTH) / 2;
         const pillBottom = position.y + size.height;
-        const pillTop = pillBottom - TOTAL_HEIGHT;
+        const pillTop = pillBottom - totalHeight;
         const pillRight = pillLeft + PILL_WIDTH;
-
-        const over =
-          cursor.x >= pillLeft &&
-          cursor.x <= pillRight &&
-          cursor.y >= pillTop &&
-          cursor.y <= pillBottom;
+        const over = cursor.x >= pillLeft
+          && cursor.x <= pillRight
+          && cursor.y >= pillTop
+          && cursor.y <= pillBottom;
 
         if (over && !isOver) {
           isOver = true;
@@ -145,72 +140,167 @@ useEffect(() => {
       clearTimeout(timer);
     };
   }, []);
-  const isPlaying = playerState.status === "playing";
- // const albumArt = playerState.artworkUrl;
 
   const handleRestore = async () => {
+    await emit("mini-player:restore-main");
     await win.hide();
     const mainWin = await WebviewWindow.getByLabel("main");
     if (mainWin) {
+      await mainWin.show();
       await mainWin.unminimize();
       await mainWin.setFocus();
+      await win.hide();
     }
   };
 
-
-
-
-useEffect(() => {
-  const setup = async () => {
-    const unlisten = await listen<TimeSync>("player-time-sync", (event) => {
-      setTimeState(event.payload);
-    });
-    return unlisten;
+  const handleAlbumArtMouseDown = (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.currentTarget.blur();
   };
-  const cleanup = setup();
-  return () => { cleanup.then(fn => fn()); };
-}, []);
+
+  const handleClose = async () => {
+    await win.hide();
+  };
+
+  const stopRightButtonDrag = async () => {
+    if (dragTimerRef.current) {
+      clearInterval(dragTimerRef.current);
+      dragTimerRef.current = null;
+    }
+
+    setIsDragging(false);
+    try {
+      const position = await win.outerPosition();
+      saveMiniPlayerPosition({ x: position.x, y: position.y });
+    } catch (_) {}
+    try {
+      await win.setCursorIcon("grab");
+    } catch (_) {}
+    await win.setIgnoreCursorEvents(false);
+  };
+
+  const handleContainerMouseDown = async (event: MouseEvent<HTMLDivElement>) => {
+    if (event.button !== RIGHT_MOUSE_BUTTON) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (dragTimerRef.current) {
+      clearInterval(dragTimerRef.current);
+      dragTimerRef.current = null;
+    }
+
+    const startCursor = await cursorPosition();
+    const startPosition = await win.outerPosition();
+
+    setIsDragging(true);
+    try {
+      await win.setCursorIcon("grabbing");
+    } catch (_) {}
+    await win.setIgnoreCursorEvents(false);
+
+    const stopDragFromDocument = (upEvent: globalThis.MouseEvent) => {
+      if (upEvent.button === RIGHT_MOUSE_BUTTON) void stopRightButtonDrag();
+    };
+    const stopDragOnBlur = () => {
+      void stopRightButtonDrag();
+    };
+
+    document.addEventListener("mouseup", stopDragFromDocument, { once: true });
+    window.addEventListener("blur", stopDragOnBlur, { once: true });
+
+    dragTimerRef.current = setInterval(() => {
+      void (async () => {
+        const cursor = await cursorPosition();
+        const nextX = startPosition.x + cursor.x - startCursor.x;
+        const nextY = startPosition.y + cursor.y - startCursor.y;
+
+        await win.setPosition(new PhysicalPosition(nextX, nextY));
+      })();
+    }, 16);
+  };
+
+  const isPlaying = playerState.status === "playing";
+  const isLoading = playerState.status === "loading";
+  const artworkUrl = playerState.artworkUrl ?? cachedArtwork;
 
   return (
-  
-  <div className={styles.wrapper}>
-    
-    {/* top pill — scrubber, slides in above */}
-    <div className={`${styles.expandedPill} ${expanded ? styles.expandedPillVisible : ""}`}>
-   <input
-    type="range"
-    min={0}
-    max={timeState.duration || 100}
-    step="any"
-    value={timeState.currentTime}
-    onChange={(e) => {
-      void emit("mini-player:seek", { time: parseFloat(e.target.value) });
-    }}
-    className={styles.scrubberInput}
-    style={{
-      "--slider-progress": `${timeState.duration > 0 ? (timeState.currentTime / timeState.duration) * 100 : 0}%`,
-    } as React.CSSProperties}
-  />  {/* <div data-tauri-drag-region>Move</div> */}
-    </div>
+    <div className={styles.wrapper}>
+      <div className={`${styles.expandedPill} ${expanded ? styles.expandedPillVisible : ""}`}>
+        <input
+          type="range"
+          min={0}
+          max={timeState.duration || 100}
+          step="any"
+          value={timeState.currentTime}
+          onChange={(event) => {
+            void emit("mini-player:seek", { time: parseFloat(event.target.value) });
+          }}
+          className={styles.scrubberInput}
+          style={{
+            "--slider-progress": `${timeState.duration > 0 ? (timeState.currentTime / timeState.duration) * 100 : 0}%`,
+          } as CSSProperties}
+        />
+      </div>
 
-    {/* bottom pill — always visible, never moves */}
-    <div data-tauri-drag-region className={styles.miniContainer}>
-      <button className={styles.albumArt} onClick={handleRestore} aria-label="Restore">
-         {cachedArtwork
-    ? <img src={cachedArtwork} alt="" className={styles.albumImg} />
-    : <div className={styles.albumPlaceholder}>♪</div>
-  }
-      </button>
-      <div className={styles.controls}>
-        <button className={styles.btn} onClick={() => emit("mini-player:skip-previous")} aria-label="Previous">⏮</button>
-        <button className={styles.btn} onClick={() => emit("mini-player:toggle-play-pause")} aria-label={isPlaying ? "Pause" : "Play"}>
-          {isPlaying ? "⏸" : "▶"}
+      <div
+        className={[
+          styles.miniContainer,
+          expanded ? styles.miniContainerExpanded : "",
+          isDragging ? styles.dragging : "",
+        ].filter(Boolean).join(" ")}
+        onMouseDown={(event) => void handleContainerMouseDown(event)}
+        onMouseUp={(event) => {
+          if (event.button === RIGHT_MOUSE_BUTTON) void stopRightButtonDrag();
+        }}
+        onContextMenu={(event) => event.preventDefault()}
+      >
+        <button
+          className={styles.albumArt}
+          onMouseDown={handleAlbumArtMouseDown}
+          onClick={handleRestore}
+          aria-label="Restore"
+        >
+          <TrackArtwork
+            artworkUrl={artworkUrl ?? undefined}
+            className={styles.albumArtwork}
+            iconSize={18}
+            loading="eager"
+          />
         </button>
-        <button className={styles.btn} onClick={() => emit("mini-player:skip-next")} aria-label="Next">⏭</button>
+
+        <div className={styles.controls}>
+          <button className={styles.btn} onClick={() => emit("mini-player:skip-previous")} aria-label="Previous">
+            <IconPlayerSkipBack size={17} fill="currentColor" aria-hidden="true" />
+          </button>
+          <button className={styles.btn} onClick={() => emit("mini-player:toggle-play-pause")} aria-label={isLoading ? "Loading song" : isPlaying ? "Pause" : "Play"}>
+            <span className={styles.iconStage} aria-hidden="true">
+              <span className={`${styles.playbackIcon} ${!isLoading && !isPlaying ? styles.activeIcon : ""}`}>
+                <IconPlayerPlay size={17} fill="currentColor" />
+              </span>
+              <span className={`${styles.playbackIcon} ${!isLoading && isPlaying ? styles.activeIcon : ""}`}>
+                <IconPlayerPause size={17} fill="currentColor" />
+              </span>
+              <span className={`${styles.playbackIcon} ${styles.loadingIcon} ${isLoading ? styles.activeIcon : ""}`}>
+                <IconLoader2 size={17} />
+              </span>
+            </span>
+          </button>
+          <button className={styles.btn} onClick={() => emit("mini-player:skip-next")} aria-label="Next">
+            <IconPlayerSkipForward size={17} fill="currentColor" aria-hidden="true" />
+          </button>
+        </div>
+
+        <button
+          className={`${styles.closeButton} ${expanded ? styles.closeButtonVisible : ""}`}
+          type="button"
+          onMouseDown={(event) => event.stopPropagation()}
+          onClick={() => void handleClose()}
+          aria-label="Close mini player"
+        >
+          <IconX size={14} aria-hidden="true" />
+        </button>
       </div>
     </div>
-
-  </div>
-);
-  
+  );
 }

@@ -26,6 +26,7 @@
 "core:window:allow-current-monitor",
 "core:window:allow-set-position",
 "core:window:allow-cursor-position",
+"core:window:allow-set-cursor-icon",
 "core:window:allow-set-ignore-cursor-events"
   ],
   "allowlist": {

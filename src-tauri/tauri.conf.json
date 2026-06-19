@@ -22,7 +22,7 @@
       },{
   "label": "mini-player",
   "url": "/mini.html",
-  "width": 100,
+  "width": 160,
   "height": 200,
   "resizable": false,
   "decorations": false,
